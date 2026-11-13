@@ -117,7 +117,6 @@ client.once('clientReady', async () => {
 
 const SPAWNER_FILE = path.join(__dirname, 'spawners.json');
 const PANEL_FILE = path.join(__dirname, 'panel.json');
-const emoji = interaction.options.getString('emoji');
 
 function loadJSON(file, fallback) {
   try {
@@ -305,10 +304,11 @@ client.on(Events.InteractionCreate, async interaction => {
   const subcommand = interaction.options.getSubcommand();
 
   // SPAWNER SETZEN
-  if (subcommand === 'set') {
+if (subcommand === 'set') {
     const name = interaction.options.getString('name').trim();
     const ankauf = interaction.options.getNumber('ankauf');
     const verkauf = interaction.options.getNumber('verkauf');
+    const emoji = interaction.options.getString('emoji');
 
     const existing = spawners.find(
       s => s.name.toLowerCase() === name.toLowerCase()
