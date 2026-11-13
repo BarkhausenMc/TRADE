@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 
 const {
@@ -9,65 +8,62 @@ const {
 
 const commands = [
   new SlashCommandBuilder()
-    .setName('spawner')
-    .setDescription('Verwalte die HugoSMP Spawner-Preise')
-
-    .addSubcommand(subcommand =>
-    subcommand
-        .setName('set')
-        .setDescription('Spawner hinzufügen oder Preise ändern')
-        .addStringOption(option =>
-        option
-            .setName('name')
-            .setDescription('Name des Spawners')
-            .setRequired(true)
-        )
-        .addNumberOption(option =>
-        option
-            .setName('ankauf')
-            .setDescription('Ankaufspreis in Millionen')
-            .setMinValue(0)
-            .setRequired(true)
-        )
-        .addNumberOption(option =>
-        option
-            .setName('verkauf')
-            .setDescription('Verkaufspreis in Millionen')
-            .setMinValue(0)
-            .setRequired(true)
-        )
-        .addStringOption(option =>
-        option
-            .setName('emoji')
-            .setDescription('Emoji für den Spawner')
-            .setRequired(true)
-        )
-    )
-
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('remove')
-        .setDescription('Spawner aus der Preisliste entfernen')
-        .addStringOption(option =>
-          option
-            .setName('name')
-            .setDescription('Name des Spawners')
-            .setRequired(true)
-        )
-    )
-
-    .addSubcommand(subcommand =>
-      subcommand
-        .setName('list')
-        .setDescription('Alle gespeicherten Spawner anzeigen')
-    )
-    .toJSON(),
+    .setName('setup-spawner')
+    .setDescription('Postet das Spawner-Panel oder aktualisiert die bestehende Nachricht'),
 
   new SlashCommandBuilder()
-    .setName('spawner-panel')
-    .setDescription('Erstellt oder aktualisiert das Spawner-Preis-Panel')
-    .toJSON()
-];
+    .setName('spawner-hinzufuegen')
+    .setDescription('Fügt einen neuen Spawner hinzu')
+    .addStringOption(option =>
+      option
+        .setName('name')
+        .setDescription('Name des Spawners')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('emoji')
+        .setDescription('Emoji des Spawners')
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('setprice')
+    .setDescription('Setzt An- und Verkaufspreise eines Spawners oder setzt sie auf Stop')
+    .addStringOption(option =>
+      option
+        .setName('name')
+        .setDescription('Name des Spawners')
+        .setRequired(true)
+        .setAutocomplete(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('ankauf')
+        .setDescription('Ankauf in Mio. oder "stop"')
+    )
+    .addStringOption(option =>
+      option
+        .setName('verkauf')
+        .setDescription('Verkauf in Mio. oder "stop"')
+    )
+    .addStringOption(option =>
+      option
+        .setName('emoji')
+        .setDescription('Emoji des Spawners ändern')
+    ),
+
+  new SlashCommandBuilder()
+    .setName('spawner-remove')
+    .setDescription('Entfernt einen Spawner')
+    .addStringOption(option =>
+      option
+        .setName('name')
+        .setDescription('Name des Spawners')
+        .setRequired(true)
+        .setAutocomplete(true)
+    )
+].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' })
   .setToken(process.env.DISCORD_BOT_TOKEN);

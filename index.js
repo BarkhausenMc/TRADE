@@ -21,8 +21,7 @@ const {
   TextDisplayComponent,
   SectionBuilder,
   Sweepers,
-  Events,
-  PermissionFlagsBits
+  Events
 } = require('discord.js');
 
 const client = new Client({
@@ -42,10 +41,9 @@ client.once('clientReady', async () => {
   const sleep = ms =>
     new Promise(resolve => setTimeout(resolve, ms));
 
-  // Farbverlauf: Dunkelblau -> Hellblau
   const gradient = (text) => {
-    const start = [0, 0, 139];      // Dark Blue
-    const end = [135, 206, 250];    // Light Sky Blue
+    const start = [0, 0, 139];
+    const end = [135, 206, 250];
 
     return [...text].map((char, i) => {
       const t = i / Math.max(text.length - 1, 1);
@@ -144,6 +142,42 @@ function formatPrice(price) {
   return `${Number(price).toLocaleString('de-DE')} Mio.`;
 }
 
+function priceText(price) {
+  if (price === null || price === undefined) {
+    return '⛔ Stop';
+  }
+
+  return formatPrice(price);
+}
+
+function parsePrice(input) {
+  const value = input.trim().toLowerCase();
+
+  if (value === 'stop') {
+    return null;
+  }
+
+  const parsed = Number(value.replace(',', '.'));
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function buildNotice(content) {
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(content)
+  );
+}
+
+const NOTICE_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
+
+function hasTradeLeaderRole(interaction) {
+  return interaction.member?.roles?.cache?.some(
+    role =>
+      role.name === 'TRADE leader' ||
+      role.id === process.env.TRADE_LEADER_ROLE_ID
+  ) ?? false;
+}
+
 
 function createSpawnerPanel() {
   const container = new ContainerBuilder();
@@ -168,14 +202,14 @@ function createSpawnerPanel() {
     );
   }
 
-    for (const spawner of spawners) {
-        container.addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-                `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-                `🛒 **Ankauf:** ${formatPrice(spawner.ankauf)}\n` +
-                `💰 **Verkauf:** ${formatPrice(spawner.verkauf)}`
-            )
-        )
+  for (const spawner of spawners) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+        `🛒 **Ankauf:** ${priceText(spawner.ankauf)}\n` +
+        `💰 **Verkauf:** ${priceText(spawner.verkauf)}`
+      )
+    );
 
     container.addSeparatorComponents(
       new SeparatorBuilder()
@@ -223,23 +257,56 @@ async function updateSpawnerPanel() {
 
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (interaction.isAutocomplete()) {
+    if (
+      interaction.commandName !== 'setprice' &&
+      interaction.commandName !== 'spawner-remove'
+    ) {
+      return;
+    }
+
+    const focused = interaction.options.getFocused(true);
+
+    if (focused.name !== 'name') {
+      return;
+    }
+
+    const query = focused.value.trim().toLowerCase();
+
+    await interaction.respond(
+      spawners
+        .filter(s => s.name.toLowerCase().includes(query))
+        .slice(0, 25)
+        .map(s => ({
+          name: `${s.emoji || '🔹'} ${s.name}`,
+          value: s.name
+        }))
+    );
+
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
-  // Nur Administratoren dürfen Preise verwalten
-  if (
-    interaction.commandName === 'spawner' ||
-    interaction.commandName === 'spawner-panel'
-  ) {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+  const tradeCommands = [
+    'setup-spawner',
+    'spawner-hinzufuegen',
+    'setprice',
+    'spawner-remove'
+  ];
+
+  if (tradeCommands.includes(interaction.commandName)) {
+    if (!hasTradeLeaderRole(interaction)) {
       return interaction.reply({
-        content: '❌ Du benötigst Administrator-Rechte für diesen Befehl.',
-        flags: MessageFlags.Ephemeral
+        components: [
+          buildNotice('❌ Du benötigst die **TRADE leader** Rolle für diesen Befehl.')
+        ],
+        flags: NOTICE_FLAGS
       });
     }
   }
 
-  // PANEL ERSTELLEN / AKTUALISIEREN
-  if (interaction.commandName === 'spawner-panel') {
+  if (interaction.commandName === 'setup-spawner') {
     await interaction.deferReply({
       flags: MessageFlags.Ephemeral
     });
@@ -247,7 +314,6 @@ client.on(Events.InteractionCreate, async interaction => {
     try {
       let message = null;
 
-      // Versuche die bisherige Nachricht zu finden
       if (panelData.channelId && panelData.messageId) {
         try {
           const oldChannel = await client.channels.fetch(
@@ -264,13 +330,11 @@ client.on(Events.InteractionCreate, async interaction => {
         }
       }
 
-      // Wenn die Nachricht noch existiert, bearbeiten
       if (message) {
         await message.edit({
           components: [createSpawnerPanel()]
         });
       } else {
-        // Ansonsten einmalig eine neue Nachricht erstellen
         message = await interaction.channel.send({
           components: [createSpawnerPanel()],
           flags: MessageFlags.IsComponentsV2
@@ -284,78 +348,184 @@ client.on(Events.InteractionCreate, async interaction => {
         saveJSON(PANEL_FILE, panelData);
       }
 
-      await interaction.editReply(
-        '✅ Das Spawner-Panel wurde erfolgreich aktualisiert!'
-      );
-
+      await interaction.editReply({
+        components: [
+          buildNotice(
+            message
+            ? '✅ Das Spawner-Panel wurde erfolgreich aktualisiert!'
+            : '✅ Das Spawner-Panel wurde erfolgreich erstellt!'
+          )
+        ],
+        flags: MessageFlags.IsComponentsV2
+      });
     } catch (error) {
       console.error(error);
 
-      await interaction.editReply(
-        '❌ Das Spawner-Panel konnte nicht erstellt werden.'
-      );
+      await interaction.editReply({
+        components: [
+          buildNotice('❌ Das Spawner-Panel konnte nicht erstellt werden.')
+        ],
+        flags: MessageFlags.IsComponentsV2
+      });
     }
 
     return;
   }
 
-  if (interaction.commandName !== 'spawner') return;
+  if (interaction.commandName === 'spawner-hinzufuegen') {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    });
 
-  const subcommand = interaction.options.getSubcommand();
-
-  // SPAWNER SETZEN
-if (subcommand === 'set') {
-    const name = interaction.options.getString('name').trim();
-    const ankauf = interaction.options.getNumber('ankauf');
-    const verkauf = interaction.options.getNumber('verkauf');
-    const emoji = interaction.options.getString('emoji');
+    const name = interaction.options.getString('name', true).trim();
+    const emoji = interaction.options.getString('emoji', true).trim();
 
     const existing = spawners.find(
       s => s.name.toLowerCase() === name.toLowerCase()
     );
 
+    let added = false;
+
     if (existing) {
-    existing.ankauf = ankauf;
-    existing.verkauf = verkauf;
-    existing.emoji = emoji;
+      existing.emoji = emoji;
     } else {
-    spawners.push({
+      spawners.push({
         name,
-        ankauf,
-        verkauf,
-        emoji
-    });
+        emoji,
+        ankauf: null,
+        verkauf: null
+      });
+
+      added = true;
     }
 
     saveJSON(SPAWNER_FILE, spawners);
 
     const updated = await updateSpawnerPanel();
 
-    return interaction.reply({
-      content:
-            `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-            `🛒 **Ankauf:** ${formatPrice(spawner.ankauf)}\n` +
-            `💰 **Verkauf:** ${formatPrice(spawner.verkauf)}`
-        (updated
-          ? 'Die zentrale Preisliste wurde aktualisiert.'
-          : '⚠️ Die Preise wurden gespeichert. Erstelle das Panel mit `/spawner-panel`.'),
-      flags: MessageFlags.Ephemeral
+    await interaction.editReply({
+      components: [
+        buildNotice(
+          (added
+            ? `✅ **${emoji} ${name}-Spawner** wurde hinzugefügt.`
+            : `♻️ **${emoji} ${name}-Spawner** existiert bereits, Emoji aktualisiert.`) +
+          `\n🛒 **Ankauf:** ${priceText(existing ? existing.ankauf : null)}` +
+          `\n💰 **Verkauf:** ${priceText(existing ? existing.verkauf : null)}` +
+          (updated
+            ? '\n\nDas Spawner-Panel wurde aktualisiert.'
+            : '\n\n⚠️ Gespeichert, aber das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
+        )
+      ],
+      flags: MessageFlags.IsComponentsV2
     });
+
+    return;
   }
 
-  // SPAWNER ENTFERNEN
-  if (subcommand === 'remove') {
-    const name = interaction.options.getString('name').trim();
+  if (interaction.commandName === 'setprice') {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    });
+
+    const name = interaction.options.getString('name', true).trim();
+
+    const spawner = spawners.find(
+      s => s.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (!spawner) {
+      await interaction.editReply({
+        components: [
+          buildNotice(`❌ Der Spawner **${name}** wurde nicht gefunden.`)
+        ],
+        flags: MessageFlags.IsComponentsV2
+      });
+
+      return;
+    }
+
+    const ankaufInput = interaction.options.getString('ankauf');
+    const verkaufInput = interaction.options.getString('verkauf');
+    const emojiInput = interaction.options.getString('emoji');
+
+    if (ankaufInput === null && verkaufInput === null && emojiInput === null) {
+      await interaction.editReply({
+        components: [
+          buildNotice('❌ Gib mindestens einen Wert an: `ankauf`, `verkauf` oder `emoji`.')
+        ],
+        flags: MessageFlags.IsComponentsV2
+      });
+
+      return;
+    }
+
+    const ankauf = ankaufInput === null ? undefined : parsePrice(ankaufInput);
+    const verkauf = verkaufInput === null ? undefined : parsePrice(verkaufInput);
+
+    if (ankauf === undefined || verkauf === undefined) {
+      await interaction.editReply({
+        components: [
+          buildNotice('❌ Ungültiger Preis. Nutze eine Zahl (Mio.) oder `stop`.')
+        ],
+        flags: MessageFlags.IsComponentsV2
+      });
+
+      return;
+    }
+
+    if (ankauf !== undefined) {
+      spawner.ankauf = ankauf;
+    }
+
+    if (verkauf !== undefined) {
+      spawner.verkauf = verkauf;
+    }
+
+    if (emojiInput !== null && emojiInput.trim() !== '') {
+      spawner.emoji = emojiInput.trim();
+    }
+
+    saveJSON(SPAWNER_FILE, spawners);
+
+    const updated = await updateSpawnerPanel();
+
+    await interaction.editReply({
+      components: [
+        buildNotice(
+          `✅ Werte aktualisiert für **${spawner.emoji || '🔹'} ${spawner.name}-Spawner**\n` +
+          `🛒 **Ankauf:** ${priceText(spawner.ankauf)}\n` +
+          `💰 **Verkauf:** ${priceText(spawner.verkauf)}` +
+          (updated
+            ? '\n\nDas Spawner-Panel wurde aktualisiert.'
+            : '\n\n⚠️ Gespeichert, aber das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
+        )
+      ],
+      flags: MessageFlags.IsComponentsV2
+    });
+
+    return;
+  }
+
+  if (interaction.commandName === 'spawner-remove') {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    });
+
+    const name = interaction.options.getString('name', true).trim();
 
     const index = spawners.findIndex(
       s => s.name.toLowerCase() === name.toLowerCase()
     );
 
     if (index === -1) {
-      return interaction.reply({
-        content: `❌ Der Spawner **${name}** wurde nicht gefunden.`,
-        flags: MessageFlags.Ephemeral
+      await interaction.editReply({
+        components: [
+          buildNotice(`❌ Der Spawner **${name}** wurde nicht gefunden.`)
+        ],
+        flags: MessageFlags.IsComponentsV2
       });
+
+      return;
     }
 
     const removed = spawners[index];
@@ -366,35 +536,19 @@ if (subcommand === 'set') {
 
     const updated = await updateSpawnerPanel();
 
-    return interaction.reply({
-      content:
-        `✅ **${removed.name}-Spawner** wurde entfernt.` +
-        (updated
-          ? '\nDie Preisliste wurde aktualisiert.'
-          : '\n⚠️ Die Preisliste konnte nicht aktualisiert werden.'),
-      flags: MessageFlags.Ephemeral
+    await interaction.editReply({
+      components: [
+        buildNotice(
+          `✅ **${removed.emoji || '🔹'} ${removed.name}-Spawner** wurde entfernt.` +
+          (updated
+            ? '\nDas Spawner-Panel wurde aktualisiert.'
+            : '\n⚠️ Das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
+        )
+      ],
+      flags: MessageFlags.IsComponentsV2
     });
-  }
 
-  // SPAWNER AUFLISTEN
-  if (subcommand === 'list') {
-    if (spawners.length === 0) {
-      return interaction.reply({
-        content: 'Es sind noch keine Spawner gespeichert.',
-        flags: MessageFlags.Ephemeral
-      });
-    }
-
-    const list = spawners.map(s =>
-      `**${s.name}**\n` +
-      `🟢 Ankauf: ${formatPrice(s.ankauf)}\n` +
-      `🔵 Verkauf: ${formatPrice(s.verkauf)}`
-    ).join('\n\n');
-
-    return interaction.reply({
-      content: `💎 **Gespeicherte Spawner:**\n\n${list}`,
-      flags: MessageFlags.Ephemeral
-    });
+    return;
   }
 });
 
