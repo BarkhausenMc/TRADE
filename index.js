@@ -284,7 +284,7 @@ function createSpawnerPanel() {
   for (const spawner of spawners) {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+        `### ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
         `🛒 **Ankaufspreise:** \`${priceText(spawner.ankauf)}\`\n` +
         `💰 **Verkaufspreise:** \`${priceText(spawner.verkauf)}\``
       )
