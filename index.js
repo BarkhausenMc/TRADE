@@ -233,19 +233,6 @@ function createSpawnerPanel() {
     );
   }
 
-  container.addActionRowComponents(
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('ticket_verkaufen')
-        .setLabel('Spawner Verkaufen')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId('ticket_kaufen')
-        .setLabel('Spawner Kaufen')
-        .setStyle(ButtonStyle.Primary)
-    )
-  );
-
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       '-# 💎 TRADE BOT • HUGOSMP\n' +
@@ -254,6 +241,23 @@ function createSpawnerPanel() {
   );
 
   return container;
+}
+
+function createTicketButtonRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ticket_verkaufen')
+      .setLabel('Spawner Verkaufen')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('ticket_kaufen')
+      .setLabel('Spawner Kaufen')
+      .setStyle(ButtonStyle.Primary)
+  );
+}
+
+function createPanelComponents() {
+  return [createSpawnerPanel(), createTicketButtonRow()];
 }
 
 async function updateSpawnerPanel() {
@@ -275,7 +279,7 @@ async function updateSpawnerPanel() {
     );
 
     await message.edit({
-      components: [createSpawnerPanel()]
+      components: createPanelComponents()
     });
 
     return true;
@@ -287,29 +291,47 @@ async function updateSpawnerPanel() {
 
 
 function buildSpawnerSelect(mode) {
-  const select = new StringSelectMenuBuilder()
-    .setCustomId(`${mode}_select`)
-    .setPlaceholder(
-      mode === 'kaufen'
-        ? 'Welchen Spawner möchtest du kaufen?'
-        : 'Welchen Spawner möchtest du verkaufen?'
-    )
-    .addOptions(
-      spawners.slice(0, 25).map(spawner =>
-        new StringSelectMenuOptionBuilder()
-          .setLabel(`${spawner.name}-Spawner`)
-          .setValue(spawner.name)
-          .setDescription(
-            `Ankauf: ${priceText(spawner.ankauf)} | Verkauf: ${priceText(spawner.verkauf)}`
-          )
-      )
-    );
+  const container = new ContainerBuilder();
 
-  const row = new ActionRowBuilder().addComponents(select);
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      mode === 'kaufen'
+        ? '## 🛒 Spawner Kaufen\n### Welchen Spawner möchtest du kaufen?\nDer Verkaufpreis gilt für diesen Kauf.'
+        : '## 💰 Spawner Verkaufen\n### Welchen Spawner möchtest du verkaufen?\nDer Ankaufpreis gilt für diesen Verkauf.'
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder()
+  );
+
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`${mode}_select`)
+        .setPlaceholder(
+          mode === 'kaufen'
+            ? 'Welchen Spawner möchtest du kaufen?'
+            : 'Welchen Spawner möchtest du verkaufen?'
+        )
+        .addOptions(
+          spawners.slice(0, 25).map(spawner =>
+            new StringSelectMenuOptionBuilder()
+              .setLabel(`${spawner.name}-Spawner`)
+              .setValue(spawner.name)
+              .setDescription(
+                mode === 'kaufen'
+                  ? `Verkauf: ${priceText(spawner.verkauf)}`
+                  : `Ankauf: ${priceText(spawner.ankauf)}`
+              )
+          )
+        )
+    )
+  );
 
   return {
-    components: [row],
-    flags: MessageFlags.Ephemeral
+    components: [container],
+    flags: NOTICE_FLAGS
   };
 }
 
@@ -346,7 +368,8 @@ async function createTicketThread(interaction, mode, spawnerName) {
     const thread = await panelChannel.threads.create({
       name: `${spawner.emoji || '🔹'} ${spawner.name}-Spawner • ${actionLabel}`,
       autoArchiveDuration: 1440,
-      type: ChannelType.GuildPublicThread,
+      type: ChannelType.PrivateThread,
+      invitable: false,
       reason: `Ticket: ${actionLabel} ${spawner.name}-Spawner (von ${interaction.user.tag})`
     });
 
@@ -546,11 +569,11 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (message) {
         await message.edit({
-          components: [createSpawnerPanel()]
+          components: createPanelComponents()
         });
       } else {
         message = await interaction.channel.send({
-          components: [createSpawnerPanel()],
+          components: createPanelComponents(),
           flags: MessageFlags.IsComponentsV2
         });
 
@@ -707,8 +730,8 @@ client.on(Events.InteractionCreate, async interaction => {
       components: [
         buildNotice(
           `✅ Werte aktualisiert für **${spawner.emoji || '🔹'} ${spawner.name}-Spawner**\n` +
-          `🛒 **Ankauf:** ${priceText(spawner.ankauf)}\n` +
-          `💰 **Verkauf:** ${priceText(spawner.verkauf)}` +
+          `🛒 **Ankauf:** \`${priceText(spawner.ankauf)}\`\n` +
+          `💰 **Verkauf:** \`${priceText(spawner.verkauf)}\`` +
           (updated
             ? '\n\nDas Spawner-Panel wurde aktualisiert.'
             : '\n\n⚠️ Gespeichert, aber das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
