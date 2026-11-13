@@ -223,8 +223,8 @@ function createSpawnerPanel() {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-        `🛒 **Ankauf:** ${priceText(spawner.ankauf)}\n` +
-        `💰 **Verkauf:** ${priceText(spawner.verkauf)}`
+        `🛒 **Ankauf:** \`${priceText(spawner.ankauf)}\`\n` +
+        `💰 **Verkauf:** \`${priceText(spawner.verkauf)}\``
       )
     );
 
@@ -730,8 +730,8 @@ client.on(Events.InteractionCreate, async interaction => {
       components: [
         buildNotice(
           `✅ Werte aktualisiert für **${spawner.emoji || '🔹'} ${spawner.name}-Spawner**\n` +
-          `🛒 **Ankauf:** \`${priceText(spawner.ankauf)}\`\n` +
-          `💰 **Verkauf:** \`${priceText(spawner.verkauf)}\`` +
+          `🛒 **Ankauf:** ${priceText(spawner.ankauf)}\n` +
+          `💰 **Verkauf:** ${priceText(spawner.verkauf)}\n` +
           (updated
             ? '\n\nDas Spawner-Panel wurde aktualisiert.'
             : '\n\n⚠️ Gespeichert, aber das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
