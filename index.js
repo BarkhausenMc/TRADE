@@ -268,8 +268,8 @@ function createSpawnerPanel() {
     container.addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
         `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-        `🛒 **Ankauf:** \`${priceText(spawner.ankauf)}\`\n` +
-        `💰 **Verkauf:** \`${priceText(spawner.verkauf)}\``
+        `🛒 **Ankaufspreise:** \`${priceText(spawner.ankauf)}\`\n` +
+        `💰 **Verkaufspreise:** \`${priceText(spawner.verkauf)}\``
       )
     );
 
@@ -291,12 +291,12 @@ function createTicketButtonRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('ticket_verkaufen')
-      .setLabel('Spawner Verkaufen')
+      .setLabel('Ich möchte meine Spawner Verkaufen')
       .setEmoji('💰')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('ticket_kaufen')
-      .setLabel('Spawner Kaufen')
+      .setLabel('Ich möchte Spawner Kaufen')
       .setEmoji('🛒')
       .setStyle(ButtonStyle.Primary)
   );
@@ -1199,6 +1199,10 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
+    const oldAnkauf = spawner.ankauf;
+    const oldVerkauf = spawner.verkauf;
+    const oldEmoji = spawner.emoji || '🔹';
+
     if (ankauf !== undefined) {
       spawner.ankauf = ankauf;
     }
@@ -1214,6 +1218,49 @@ client.on(Events.InteractionCreate, async interaction => {
     saveJSON(SPAWNER_FILE, spawners);
 
     const updated = await updateSpawnerPanel();
+
+    // Preisänderungen im Discord-Channel protokollieren
+try {
+  const logChannelId = process.env.LOG_CHANNEL_ID;
+
+  if (logChannelId) {
+    const logChannel = await client.channels.fetch(logChannelId);
+
+    if (logChannel?.isTextBased()) {
+      const changes = [];
+
+      if (ankauf !== undefined) {
+        changes.push(
+          `🛒 **Ankauf:** ${priceText(oldAnkauf)} → ${priceText(spawner.ankauf)}`
+        );
+      }
+
+      if (verkauf !== undefined) {
+        changes.push(
+          `💰 **Verkauf:** ${priceText(oldVerkauf)} → ${priceText(spawner.verkauf)}`
+        );
+      }
+
+      if (emojiInput !== null && emojiInput.trim() !== '') {
+        changes.push(
+          `🎨 **Emoji:** ${oldEmoji} → ${spawner.emoji}`
+        );
+      }
+
+      if (changes.length > 0) {
+        await logChannel.send({
+          content:
+            `# 📊 Spawner-Preisänderung\n` +
+            `**Spawner:** ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n\n` +
+            changes.join('\n') +
+            `\n\n**Geändert von:** <@${interaction.user.id}>`
+        });
+      }
+    }
+  }
+} catch (error) {
+  console.error('[PRICE LOG ERROR]', error);
+}
 
     await interaction.editReply({
       components: [
