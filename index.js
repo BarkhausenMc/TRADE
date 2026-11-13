@@ -1221,7 +1221,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // Preisänderungen im Discord-Channel protokollieren
 try {
-  const logChannelId = process.env.PRICE_LOG_CHANNEL_ID;
+  const logChannelId = process.env.LOG_CHANNEL_ID;
 
   if (logChannelId) {
     const logChannel = await client.channels.fetch(logChannelId);
