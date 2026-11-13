@@ -28,35 +28,6 @@ const bot = mineflayer.createBot({
   version: '1.21.4'
 });
 
-console.log('[MC] Mineflayer createBot wurde ausgeführt.');
-
-bot.on('login', () => {
-  console.log('[MC] Erfolgreich beim Minecraft-Server eingeloggt!');
-});
-
-bot.on('spawn', () => {
-  console.log('[MC] Minecraft-Bot ist gespawnt!');
-});
-
-bot.on('connect', () => {
-  console.log('[MC] TCP-Verbindung hergestellt.');
-});
-
-bot.on('end', (reason) => {
-  console.log('[MC] Verbindung beendet:', reason);
-});
-
-bot.on('kicked', (reason) => {
-  console.log('[MC] Bot wurde gekickt:', reason);
-});
-
-bot.on('error', (error) => {
-  console.error('[MC] Mineflayer Error:', error);
-});
-
-bot.on('login', () => {
-  console.log('[MC] Login erfolgreich.');
-});
 
 bot._client.on('add_resource_pack', (data) => {
   console.log(`Accept Server-Resource-Pack. url: ${data.url} , uuid: ${data.uuid}`);
