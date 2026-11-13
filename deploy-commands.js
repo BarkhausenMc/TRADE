@@ -13,27 +13,33 @@ const commands = [
     .setDescription('Verwalte die HugoSMP Spawner-Preise')
 
     .addSubcommand(subcommand =>
-      subcommand
+    subcommand
         .setName('set')
         .setDescription('Spawner hinzufügen oder Preise ändern')
         .addStringOption(option =>
-          option
+        option
             .setName('name')
             .setDescription('Name des Spawners')
             .setRequired(true)
         )
         .addNumberOption(option =>
-          option
+        option
             .setName('ankauf')
             .setDescription('Ankaufspreis in Millionen')
             .setMinValue(0)
             .setRequired(true)
         )
         .addNumberOption(option =>
-          option
+        option
             .setName('verkauf')
             .setDescription('Verkaufspreis in Millionen')
             .setMinValue(0)
+            .setRequired(true)
+        )
+        .addStringOption(option =>
+        option
+            .setName('emoji')
+            .setDescription('Emoji für den Spawner')
             .setRequired(true)
         )
     )

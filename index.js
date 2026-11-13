@@ -117,6 +117,7 @@ client.once('clientReady', async () => {
 
 const SPAWNER_FILE = path.join(__dirname, 'spawners.json');
 const PANEL_FILE = path.join(__dirname, 'panel.json');
+const emoji = interaction.options.getString('emoji');
 
 function loadJSON(file, fallback) {
   try {
@@ -314,14 +315,16 @@ client.on(Events.InteractionCreate, async interaction => {
     );
 
     if (existing) {
-      existing.ankauf = ankauf;
-      existing.verkauf = verkauf;
+    existing.ankauf = ankauf;
+    existing.verkauf = verkauf;
+    existing.emoji = emoji;
     } else {
-      spawners.push({
+    spawners.push({
         name,
         ankauf,
-        verkauf
-      });
+        verkauf,
+        emoji
+    });
     }
 
     saveJSON(SPAWNER_FILE, spawners);
@@ -330,9 +333,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
     return interaction.reply({
       content:
-        `✅ **${name}-Spawner** wurde ${existing ? 'aktualisiert' : 'hinzugefügt'}!\n\n` +
-        `🟢 Ankauf: **${formatPrice(ankauf)}**\n` +
-        `🔵 Verkauf: **${formatPrice(verkauf)}**\n\n` +
+            `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+            `🛒 **Ankauf:** ${formatPrice(spawner.ankauf)}\n` +
+            `💰 **Verkauf:** ${formatPrice(spawner.verkauf)}`
         (updated
           ? 'Die zentrale Preisliste wurde aktualisiert.'
           : '⚠️ Die Preise wurden gespeichert. Erstelle das Panel mit `/spawner-panel`.'),
