@@ -142,11 +142,20 @@ let panelData = loadJSON(PANEL_FILE, {
   messageId: null
 });
 let ticketData = loadJSON(TICKETS_FILE, {
-  count: 0
+  count: 0,
+  tickets: {}
 });
 
 function formatPrice(price) {
-  return `${Number(price).toLocaleString('de-DE')} Mio.`;
+  const value = Number(price);
+
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toLocaleString('de-DE', {
+      maximumFractionDigits: 2
+    })} b`;
+  }
+
+  return `${value.toLocaleString('de-DE')} Mio.`;
 }
 
 function priceText(price) {
@@ -259,6 +268,21 @@ function createTicketButtonRow() {
       .setLabel('Spawner Kaufen')
       .setEmoji('🛒')
       .setStyle(ButtonStyle.Primary)
+  );
+}
+
+function createClaimButtonRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ticket_claim')
+      .setLabel('Claim')
+      .setEmoji('🙋')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('ticket_cancel')
+      .setLabel('Abbrechen')
+      .setEmoji('🗑️')
+      .setStyle(ButtonStyle.Secondary)
   );
 }
 
@@ -376,26 +400,23 @@ function buildTicketModal(mode, spawnerName) {
 }
 
 
-function buildTicketEmbed(mode, spawner, ingameName, anzahl, tradeNumber, customerId) {
+function buildTicketEmbed(ticket) {
   const titleLine =
-    mode === 'kaufen'
+    ticket.mode === 'kaufen'
       ? '🛒 • Spawner Kaufen'
       : '💰 • Spawner Verkauf';
 
-  const relevantPrice =
-    mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
-
-  const gesamtpreis =
-    relevantPrice === null
-      ? 'Stop'
-      : formatPrice(relevantPrice * anzahl);
+  const statusLine =
+    ticket.claimedBy === null
+      ? '🔓 **Status:** Offen'
+      : `🔒 **Geclaimt von:** <@${ticket.claimedBy}>`;
 
   const container = new ContainerBuilder();
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `## ${titleLine}\n` +
-      `🤝 • Handel #${tradeNumber}`
+      `🤝 • Handel #${ticket.tradeNumber}`
     )
   );
 
@@ -405,8 +426,8 @@ function buildTicketEmbed(mode, spawner, ingameName, anzahl, tradeNumber, custom
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `👤 **Kunde:** <@${customerId}>\n` +
-      `🎮 **ING:** \`${ingameName}\``
+      `👤 **Kunde:** <@${ticket.customerId}>\n` +
+      `🎮 **ING:** \`${ticket.ingameName}\``
     )
   );
 
@@ -416,14 +437,26 @@ function buildTicketEmbed(mode, spawner, ingameName, anzahl, tradeNumber, custom
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `💥 **Spawner:** ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-      `📦 **Menge:** \`${anzahl}\`\n` +
-      `💵 **Preis/Stk:** \`${priceText(relevantPrice)}\`\n` +
-      `💰 **Gesamtpreis:** \`${gesamtpreis}\``
+      `${ticket.spawnerEmoji || '🔹'}  **Spawner:** ${ticket.spawnerName}-Spawner\n` +
+      `📦 **Menge:** \`${ticket.anzahl}\`\n` +
+      `💵 **Preis/Stk:** \`${priceText(ticket.preisStk)}\`\n` +
+      `💰 **Gesamtpreis:** \`${ticket.gesamtpreis}\``
     )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder()
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(statusLine)
   );
 
   return container;
+}
+
+function createTicketComponents(ticket) {
+  return [buildTicketEmbed(ticket), createClaimButtonRow()];
 }
 
 
@@ -444,6 +477,11 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
   }
 
   const actionLabel = mode === 'kaufen' ? 'Kaufen' : 'Verkauf';
+  const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+  const gesamtpreis =
+    relevantPrice === null
+      ? 'Stop'
+      : formatPrice(relevantPrice * anzahl);
 
   try {
     const panelChannel = await client.channels.fetch(
@@ -484,21 +522,30 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
     }
 
     ticketData.count += 1;
-    saveJSON(TICKETS_FILE, ticketData);
 
-    await thread.send({
-      components: [
-        buildTicketEmbed(
-          mode,
-          spawner,
-          ingameName,
-          anzahl,
-          ticketData.count,
-          interaction.user.id
-        )
-      ],
+    const ticket = {
+      messageId: null,
+      mode,
+      spawnerName: spawner.name,
+      spawnerEmoji: spawner.emoji || '🔹',
+      ingameName,
+      anzahl,
+      tradeNumber: ticketData.count,
+      customerId: interaction.user.id,
+      preisStk: relevantPrice,
+      gesamtpreis,
+      claimedBy: null
+    };
+
+    const ticketMessage = await thread.send({
+      components: createTicketComponents(ticket),
       flags: MessageFlags.IsComponentsV2
     });
+
+    ticket.messageId = ticketMessage.id;
+    ticketData.tickets[thread.id] = ticket;
+
+    saveJSON(TICKETS_FILE, ticketData);
 
     await interaction.editReply({
       components: [
@@ -519,6 +566,103 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
       flags: NOTICE_FLAGS
     });
   }
+}
+
+
+async function handleTicketClaim(interaction) {
+  const ticket = ticketData.tickets[interaction.channel.id];
+
+  if (!ticket || !ticket.messageId) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Dieses Ticket konnte nicht gefunden werden.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  const traderRole = resolveTraderRole(interaction.guild);
+
+  const isTrader =
+    traderRole &&
+    interaction.member?.roles?.cache?.has(traderRole.id);
+
+  if (!isTrader) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Nur Mitglieder der **Trader**-Rolle können einen Trade claimen.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  if (ticket.claimedBy !== null) {
+    return interaction.reply({
+      components: [
+        buildNotice(
+          `⚠️ Dieser Trade wurde bereits von <@${ticket.claimedBy}> geclaimt.`
+        )
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  ticket.claimedBy = interaction.user.id;
+
+  saveJSON(TICKETS_FILE, ticketData);
+
+  try {
+    const message = await interaction.channel.messages.fetch(
+      ticket.messageId
+    );
+
+    await message.edit({
+      components: createTicketComponents(ticket)
+    });
+  } catch (error) {
+    console.error('Ticket-Nachricht konnte nicht aktualisiert werden:', error);
+  }
+
+  return interaction.reply({
+    components: [
+      buildNotice(`🙋 <@${interaction.user.id}> hat diesen Trade geclaimt.`)
+    ],
+    flags: NOTICE_FLAGS
+  });
+}
+
+
+async function handleTicketCancel(interaction) {
+  const ticket = ticketData.tickets[interaction.channel.id];
+
+  if (!ticket) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Dieses Ticket konnte nicht gefunden werden.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  await interaction.reply({
+    components: [
+      buildNotice('🗑️ Dieses Ticket wird in **5 Sekunden** gelöscht.')
+    ],
+    flags: NOTICE_FLAGS
+  });
+
+  setTimeout(async () => {
+    delete ticketData.tickets[interaction.channel.id];
+    saveJSON(TICKETS_FILE, ticketData);
+
+    try {
+      await interaction.channel.delete(
+        'Ticket wurde abgebrochen'
+      );
+    } catch (error) {
+      console.error('Ticket-Thread konnte nicht gelöscht werden:', error);
+    }
+  }, 5000);
 }
 
 
@@ -553,6 +697,14 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 
   if (interaction.isButton()) {
+    if (interaction.customId === 'ticket_claim') {
+      return handleTicketClaim(interaction);
+    }
+
+    if (interaction.customId === 'ticket_cancel') {
+      return handleTicketCancel(interaction);
+    }
+
     if (
       interaction.customId !== 'ticket_kaufen' &&
       interaction.customId !== 'ticket_verkaufen'
