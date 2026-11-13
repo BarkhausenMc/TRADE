@@ -635,6 +635,43 @@ async function handleInteraction(interaction) {
     }
   }
 
+if (interaction.commandName === 'tpaccept') {
+    if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
+      await interaction.reply({
+        content: 'You are not authorized to use this command.',
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    const playerName = interaction.options.getString('player');
+
+    const validationError = validateChatRequest(playerName, interaction.user.id);
+    if (validationError) {
+      await interaction.reply({
+        content: validationError,
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    messageHistory.set(interaction.user.id, Date.now());
+
+    try {
+      bot.chat(`/tpaccept ${playerName}`);
+
+      await interaction.reply({
+        content: `Tpa got accepted`,
+        flags: MessageFlags.Ephemeral
+      });
+    } catch (error) {
+      await interaction.reply({
+        content: 'Failed to send message. Bot may be disconnected.',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+  }
+
   if (interaction.commandName === 'pay') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
       await interaction.reply({

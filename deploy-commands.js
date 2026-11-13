@@ -131,6 +131,18 @@ const commands = [
     ]
   },
   {
+    name: 'tpaccept',
+    description: 'Accepts a Tpa from another Player',
+    options: [
+      {
+        name: 'player',
+        description: 'Player whos Tpa get Accepted',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
     name: 'pay',
     description: 'Pays someone Money Ingame',
     options: [
