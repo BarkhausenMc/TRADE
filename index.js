@@ -355,13 +355,7 @@ function createClaimedButtonRow() {
 }
 
 function createCompletedButtonRow() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('ticket_cancel')
-      .setLabel('Abbrechen')
-      .setEmoji('🗑️')
-      .setStyle(ButtonStyle.Secondary)
-  );
+  return null;
 }
 
 function createPanelComponents() {
@@ -539,11 +533,13 @@ function buildTicketEmbed(ticket) {
 }
 
 function createTicketComponents(ticket) {
+  if (ticket.abgeschlossen) {
+    return [buildTicketEmbed(ticket)];
+  }
+
   let buttonRow;
 
-  if (ticket.abgeschlossen) {
-    buttonRow = createCompletedButtonRow();
-  } else if (ticket.claimedBy === null) {
+  if (ticket.claimedBy === null) {
     buttonRow = createClaimButtonRow();
   } else {
     buttonRow = createClaimedButtonRow();
