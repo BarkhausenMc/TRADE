@@ -62,8 +62,121 @@ const commands = [
         .setDescription('Name des Spawners')
         .setRequired(true)
         .setAutocomplete(true)
-    )
-].map(command => command.toJSON());
+    ),
+
+  {
+    name: 'msg',
+    description: 'Send a private message to a Minecraft player',
+    options: [
+      {
+        name: 'player',
+        description: 'Minecraft username of the recipient',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'nachricht',
+        description: 'Message content to send',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'chat',
+    description: 'Send a message to the Minecraft chat',
+    options: [
+      {
+        name: 'text',
+        description: 'Message content to send',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'clan-chat',
+    description: 'Send a message to the Clan chat',
+    options: [
+      {
+        name: 'text',
+        description: 'Message content to send',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'clan-kick',
+    description: 'Kicks a Clan Member out of the Clan',
+    options: [
+      {
+        name: 'player',
+        description: 'Member that is getting kickt',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'clan-invite',
+    description: 'Invits a Player into the Clan',
+    options: [
+      {
+        name: 'player',
+        description: 'Player is getting invited into the Clan',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'pay',
+    description: 'Pays someone Money Ingame',
+    options: [
+      {
+        name: 'player',
+        description: 'Minecraft username of the recipient',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'amount',
+        description: 'A pay out for Clan Duels or Spawner',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'pay-request',
+    description: 'Send a payment request for clan review',
+    options: [
+      {
+        name: 'player',
+        description: 'Minecraft username receiving the payment',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'amount',
+        description: 'Payment amount (e.g. $100)',
+        type: 3,
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for the payment',
+        type: 3,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'clan-info',
+    description: 'Shows all clan members and their roles'
+  }
+].map(command => command.toJSON ? command.toJSON() : command);
 
 const rest = new REST({ version: '10' })
   .setToken(process.env.DISCORD_BOT_TOKEN);
