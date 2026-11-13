@@ -315,7 +315,12 @@ function createTicketButtonRow() {
       .setCustomId('ticket_kaufen')
       .setLabel('Ich möchte Spawner Kaufen')
       .setEmoji('🛒')
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('spawner_price_role')
+      .setLabel('Price Rolle')
+      .setEmoji('🔔')
+      .setStyle(ButtonStyle.Secondary)
   );
 }
 
@@ -1110,6 +1115,67 @@ async function deletePriceLog() {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+
+  if (interaction.customId === 'spawner_price_role') {
+  const roleId = process.env.SPAWNER_PRICE_ROLE_ID;
+
+  if (!roleId) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Die Spawner Price Role ist nicht konfiguriert.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  const role = interaction.guild.roles.cache.get(roleId);
+
+  if (!role) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Die Spawner Price Rolle wurde nicht gefunden.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  const member = await interaction.guild.members.fetch(
+    interaction.user.id
+  );
+
+  try {
+    if (member.roles.cache.has(roleId)) {
+      await member.roles.remove(roleId);
+
+      return interaction.reply({
+        components: [
+          buildNotice('🔕 Du hast die **Spawner Price**-Rolle erfolgreich abgegeben.')
+        ],
+        flags: NOTICE_FLAGS
+      });
+    }
+
+    await member.roles.add(roleId);
+
+    return interaction.reply({
+      components: [
+        buildNotice('🔔 Du hast die **Spawner Price**-Rolle erfolgreich erhalten!')
+      ],
+      flags: NOTICE_FLAGS
+    });
+
+  } catch (error) {
+    console.error('[SPAWNER PRICE ROLE ERROR]', error);
+
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Die Rolle konnte nicht geändert werden. Bitte überprüfe meine Discord-Berechtigungen.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+}
+
   if (interaction.isAutocomplete()) {
     if (
       interaction.commandName !== 'setprice' &&
