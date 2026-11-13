@@ -1149,7 +1149,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
       return interaction.reply({
         components: [
-          buildNotice('🔕 Du hast die **Spawner Price**-Rolle erfolgreich abgegeben.')
+          buildNotice('🔕 Du bekommst nun keinen Ping mehr, wenn Preisänderungen vorgenommen wurden!')
         ],
         flags: NOTICE_FLAGS
       });
@@ -1159,7 +1159,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
     return interaction.reply({
       components: [
-        buildNotice('🔔 Du hast die **Spawner Price**-Rolle erfolgreich erhalten!')
+        buildNotice('🔔 Du bekommst nun einen Ping, wenn Preisänderungen vorgenommen wurden!')
       ],
       flags: NOTICE_FLAGS
     });
