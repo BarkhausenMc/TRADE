@@ -1000,6 +1000,10 @@ async function updatePriceLog(interaction, spawner, changes) {
 
     const components = [createPriceLogContainer()];
 
+    const pingContent = roleId
+      ? `<@&${roleId}>`
+      : '';
+
     // Nachricht aktualisieren oder neu erstellen
     if (message) {
       await message.edit({
@@ -1009,8 +1013,12 @@ async function updatePriceLog(interaction, spawner, changes) {
       console.log('[PRICE LOG] Nachricht aktualisiert.');
     } else {
       message = await channel.send({
+        content: pingContent,
         components,
-        flags: MessageFlags.IsComponentsV2
+        flags: MessageFlags.IsComponentsV2,
+        allowedMentions: {
+          roles: roleId ? [roleId] : []
+        }
       });
 
       priceLogData.channelId = channelId;
@@ -1030,21 +1038,18 @@ async function updatePriceLog(interaction, spawner, changes) {
     // Spawner Ping versenden
     if (roleId) {
       try {
-        const pingMessage = await channel.send({
-          content:
-            `<@&${roleId}> 💎 Es gab eine Preisänderung bei ` +
-            `**${spawner.name}-Spawner**!`,
-          allowedMentions: {
-            roles: [roleId]
-          }
-        });
+      const pingMessage = await channel.send({
+        content: `<@&${roleId}> 💎 Die Preise des ${spawner.name}-Spawners wurden aktualisiert!`,
+        allowedMentions: {
+          roles: [roleId]
+        }
+      });
 
-        // Ping-Nachricht nach 5 Sekunden entfernen
-        setTimeout(async () => {
-          try {
-            await pingMessage.delete();
-          } catch {}
-        }, 5000);
+      setTimeout(async () => {
+        try {
+          await pingMessage.delete();
+        } catch {}
+      }, 5000);
 
       } catch (error) {
         console.error('[PRICE PING ERROR]', error);
@@ -1417,10 +1422,19 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
-    const ankauf = ankaufInput === null ? undefined : parsePrice(ankaufInput);
-    const verkauf = verkaufInput === null ? undefined : parsePrice(verkaufInput);
+    const ankauf = ankaufInput === null
+      ? undefined
+      : parsePrice(ankaufInput);
 
-    if (ankauf === undefined || verkauf === undefined) {
+    const verkauf = verkaufInput === null
+      ? undefined
+      : parsePrice(verkaufInput);
+
+    // Nur tatsächlich angegebene Preise überprüfen
+    if (
+      (ankaufInput !== null && ankauf === undefined) ||
+      (verkaufInput !== null && verkauf === undefined)
+    ) {
       await interaction.editReply({
         components: [
           buildNotice('❌ Ungültiger Preis. Nutze eine Zahl (Mio.) oder `stop`.')
