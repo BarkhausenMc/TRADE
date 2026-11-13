@@ -248,10 +248,12 @@ function createTicketButtonRow() {
     new ButtonBuilder()
       .setCustomId('ticket_verkaufen')
       .setLabel('Spawner Verkaufen')
+      .setEmoji('💰')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('ticket_kaufen')
       .setLabel('Spawner Kaufen')
+      .setEmoji('🛒')
       .setStyle(ButtonStyle.Primary)
   );
 }
