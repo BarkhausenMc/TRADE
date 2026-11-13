@@ -143,6 +143,7 @@ let panelData = loadJSON(PANEL_FILE, {
 });
 let ticketData = loadJSON(TICKETS_FILE, {
   count: 0,
+  completed: 0,
   tickets: {}
 });
 
@@ -152,6 +153,10 @@ if (!ticketData.tickets) {
 
 if (typeof ticketData.count !== 'number') {
   ticketData.count = 0;
+}
+
+if (typeof ticketData.completed !== 'number') {
+  ticketData.completed = 0;
 }
 
 function formatPrice(price) {
@@ -193,6 +198,7 @@ function buildNotice(content) {
 }
 
 const NOTICE_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
+const PUBLIC_FLAGS = MessageFlags.IsComponentsV2;
 
 function hasTradeLeaderRole(interaction) {
   return interaction.member?.roles?.cache?.some(
@@ -229,9 +235,19 @@ function createSpawnerPanel() {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      '# 💎 HUGOSMP – SPAWNER MARKT\n' +
-      '### Aktuelle An- und Verkaufspreise\n' +
-      'Hier findest du alle aktuellen Spawner-Preise.'
+      '# 🛒 • SPAWNER TRADING • 💰\n' +
+      '*TRADE (yayk Clan Spawner Trading)*\n' +
+      '||*Only Trusted Trader, Faire Preise 💜*||'
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder()
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `**Insgesamt abgeschlossene Trades:** \`${ticketData.completed}\``
     )
   );
 
@@ -312,7 +328,22 @@ function createClaimedButtonRow() {
       .setCustomId('ticket_release')
       .setLabel('Freigeben')
       .setEmoji('🔓')
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('ticket_cancel')
+      .setLabel('Abbrechen')
+      .setEmoji('🗑️')
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+function createCompletedButtonRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ticket_cancel')
+      .setLabel('Abbrechen')
+      .setEmoji('🗑️')
+      .setStyle(ButtonStyle.Secondary)
   );
 }
 
@@ -451,7 +482,7 @@ function buildTicketEmbed(ticket) {
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       `## ${titleLine}\n` +
-      `🤝 • Handel #${ticket.tradeNumber}`
+      `**🤝 • Handel #${ticket.tradeNumber}**`
     )
   );
 
@@ -491,25 +522,26 @@ function buildTicketEmbed(ticket) {
 }
 
 function createTicketComponents(ticket) {
-  if (ticket.abgeschlossen) {
-    return [buildTicketEmbed(ticket)];
-  }
+  let buttonRow;
 
-  const buttonRow =
-    ticket.claimedBy === null
-      ? createClaimButtonRow()
-      : createClaimedButtonRow();
+  if (ticket.abgeschlossen) {
+    buttonRow = createCompletedButtonRow();
+  } else if (ticket.claimedBy === null) {
+    buttonRow = createClaimButtonRow();
+  } else {
+    buttonRow = createClaimedButtonRow();
+  }
 
   return [buildTicketEmbed(ticket), buttonRow];
 }
 
-async function updateTicketMessage(interaction, ticket) {
+async function updateTicketMessage(channel, ticket) {
   if (!ticket.messageId) {
     return;
   }
 
   try {
-    const message = await interaction.channel.messages.fetch(
+    const message = await channel.messages.fetch(
       ticket.messageId
     );
 
@@ -683,13 +715,15 @@ async function handleTicketClaim(interaction) {
 
   saveJSON(TICKETS_FILE, ticketData);
 
-  await updateTicketMessage(interaction, ticket);
+  await interaction.update({
+    components: createTicketComponents(ticket)
+  });
 
-  return interaction.reply({
+  await interaction.channel.send({
     components: [
       buildNotice(`🙋 <@${interaction.user.id}> hat diesen Trade geclaimt.`)
     ],
-    flags: NOTICE_FLAGS
+    flags: PUBLIC_FLAGS
   });
 }
 
@@ -731,16 +765,18 @@ async function handleTicketRelease(interaction) {
 
   saveJSON(TICKETS_FILE, ticketData);
 
-  await updateTicketMessage(interaction, ticket);
+  await interaction.update({
+    components: createTicketComponents(ticket)
+  });
 
-  return interaction.reply({
+  await interaction.channel.send({
     components: [
       buildNotice(
         `🔓 <@${previousClaimer}> hat den Trade freigegeben. ` +
         'Der Trade kann wieder geclaimt werden.'
       )
     ],
-    flags: NOTICE_FLAGS
+    flags: PUBLIC_FLAGS
   });
 }
 
@@ -773,20 +809,25 @@ async function handleTicketSold(interaction) {
   }
 
   ticket.abgeschlossen = true;
+  ticketData.completed += 1;
 
   saveJSON(TICKETS_FILE, ticketData);
 
-  await updateTicketMessage(interaction, ticket);
+  await updateTicketMessage(interaction.channel, ticket);
 
-  await interaction.reply({
+  await updateSpawnerPanel();
+
+  await interaction.channel.send({
     components: [
       buildNotice(
         `✅ <@${interaction.user.id}> hat den Trade als angekauft markiert.\n` +
         '🗑️ Dieses Ticket wird in **5 Sekunden** geschlossen.'
       )
     ],
-    flags: NOTICE_FLAGS
+    flags: PUBLIC_FLAGS
   });
+
+  await interaction.deferUpdate();
 
   setTimeout(async () => {
     delete ticketData.tickets[interaction.channel.id];
@@ -1207,7 +1248,7 @@ client.on(Events.InteractionCreate, async interaction => {
         components: [
           buildNotice(`❌ Der Spawner **${name}** wurde nicht gefunden.`)
         ],
-        flags: MessageFlags.IsComponentsV2
+        flags: NOTICE_FLAGS
       });
 
       return;
