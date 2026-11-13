@@ -146,6 +146,14 @@ let ticketData = loadJSON(TICKETS_FILE, {
   tickets: {}
 });
 
+if (!ticketData.tickets) {
+  ticketData.tickets = {};
+}
+
+if (typeof ticketData.count !== 'number') {
+  ticketData.count = 0;
+}
+
 function formatPrice(price) {
   const value = Number(price);
 
