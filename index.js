@@ -21,7 +21,10 @@ const {
   TextDisplayComponent,
   SectionBuilder,
   Sweepers,
-  Events
+  Events,
+  PermissionFlagsBits,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder
 } = require('discord.js');
 
 const client = new Client({
@@ -144,7 +147,7 @@ function formatPrice(price) {
 
 function priceText(price) {
   if (price === null || price === undefined) {
-    return '⛔ Stop';
+    return 'Stop';
   }
 
   return formatPrice(price);
@@ -176,6 +179,20 @@ function hasTradeLeaderRole(interaction) {
       role.name === 'TRADE leader' ||
       role.id === process.env.TRADE_LEADER_ROLE_ID
   ) ?? false;
+}
+
+function resolveTraderRole(guild) {
+  if (process.env.TRADER_ROLE_ID) {
+    const roleById = guild.roles.cache.get(process.env.TRADER_ROLE_ID);
+
+    if (roleById) {
+      return roleById;
+    }
+  }
+
+  return guild.roles.cache.find(
+    role => role.name.toLowerCase() === 'trader'
+  ) ?? null;
 }
 
 
@@ -215,6 +232,19 @@ function createSpawnerPanel() {
       new SeparatorBuilder()
     );
   }
+
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('ticket_verkaufen')
+        .setLabel('Spawner Verkaufen')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('ticket_kaufen')
+        .setLabel('Spawner Kaufen')
+        .setStyle(ButtonStyle.Primary)
+    )
+  );
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
@@ -256,6 +286,141 @@ async function updateSpawnerPanel() {
 }
 
 
+function buildSpawnerSelect(mode) {
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`${mode}_select`)
+    .setPlaceholder(
+      mode === 'kaufen'
+        ? 'Welchen Spawner möchtest du kaufen?'
+        : 'Welchen Spawner möchtest du verkaufen?'
+    )
+    .addOptions(
+      spawners.slice(0, 25).map(spawner =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`${spawner.name}-Spawner`)
+          .setValue(spawner.name)
+          .setDescription(
+            `Ankauf: ${priceText(spawner.ankauf)} | Verkauf: ${priceText(spawner.verkauf)}`
+          )
+      )
+    );
+
+  const row = new ActionRowBuilder().addComponents(select);
+
+  return {
+    components: [row],
+    flags: MessageFlags.Ephemeral
+  };
+}
+
+
+async function createTicketThread(interaction, mode, spawnerName) {
+  const spawner = spawners.find(
+    s => s.name.toLowerCase() === spawnerName.toLowerCase()
+  );
+
+  if (!spawner) {
+    await interaction.editReply({
+      components: [
+        buildNotice('❌ Dieser Spawner existiert nicht mehr. Bitte wähle erneut.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+
+    return;
+  }
+
+  const actionLabel = mode === 'kaufen' ? 'Kauf' : 'Verkauf';
+  const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+  const priceLabel = mode === 'kaufen' ? 'Kaufpreis' : 'Verkaufserlös';
+
+  try {
+    const panelChannel = await client.channels.fetch(
+      panelData.channelId
+    );
+
+    if (!panelChannel) {
+      throw new Error('Panel-Kanal nicht gefunden');
+    }
+
+    const thread = await panelChannel.threads.create({
+      name: `${spawner.emoji || '🔹'} ${spawner.name}-Spawner • ${actionLabel}`,
+      autoArchiveDuration: 1440,
+      type: ChannelType.GuildPublicThread,
+      reason: `Ticket: ${actionLabel} ${spawner.name}-Spawner (von ${interaction.user.tag})`
+    });
+
+    const memberRows = await interaction.guild.members.fetch();
+    const traderRole = resolveTraderRole(interaction.guild);
+
+    const membersToAdd = new Set([interaction.user.id]);
+
+    if (traderRole) {
+      for (const member of memberRows.values()) {
+        if (member.roles.cache.has(traderRole.id)) {
+          membersToAdd.add(member.id);
+        }
+      }
+    }
+
+    for (const userId of membersToAdd) {
+      try {
+        await thread.members.add(userId);
+      } catch {
+        continue;
+      }
+    }
+
+    await thread.send({
+      components: [
+        new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `# 🎫 ${actionLabel}-Ticket: ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+              `Erstellt von: <@${interaction.user.id}>\n\n` +
+              (mode === 'kaufen'
+                ? `💰 **Kaufpreis:** ${priceText(relevantPrice)}\n`
+                : `🛒 **Ankauf:** ${priceText(relevantPrice)}\n`) +
+              `ℹ️ **Referenz:** Kauf ${priceText(spawner.ankauf)} / Verkauf ${priceText(spawner.verkauf)}` +
+              (traderRole
+                ? `\n\n🔔 <@&${traderRole.id}> – ein Trader kümmert sich darum.`
+                : '')
+            )
+          )
+          .addSeparatorComponents(
+            new SeparatorBuilder()
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              '-# 💎 TRADE BOT • HUGOSMP TICKET'
+            )
+          )
+      ],
+      flags: MessageFlags.IsComponentsV2
+    });
+
+    await interaction.editReply({
+      components: [
+        buildNotice(
+          `✅ Dein **${actionLabel}-Ticket** für **${spawner.emoji || '🔹'} ${spawner.name}-Spawner** wurde erstellt:\n` +
+          `➡️ <#${thread.id}>`
+        )
+      ],
+      flags: NOTICE_FLAGS
+    });
+  } catch (error) {
+    console.error('Ticket konnte nicht erstellt werden:', error);
+
+    await interaction.editReply({
+      components: [
+        buildNotice('❌ Das Ticket konnte nicht erstellt werden.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+}
+
+
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isAutocomplete()) {
     if (
@@ -284,6 +449,55 @@ client.on(Events.InteractionCreate, async interaction => {
     );
 
     return;
+  }
+
+  if (interaction.isButton()) {
+    if (
+      interaction.customId !== 'ticket_kaufen' &&
+      interaction.customId !== 'ticket_verkaufen'
+    ) {
+      return;
+    }
+
+    const mode =
+      interaction.customId === 'ticket_kaufen'
+        ? 'kaufen'
+        : 'verkaufen';
+
+    if (spawners.length === 0) {
+      return interaction.reply({
+        components: [
+          buildNotice('❌ Aktuell sind keine Spawner verfügbar.')
+        ],
+        flags: NOTICE_FLAGS
+      });
+    }
+
+    return interaction.reply(buildSpawnerSelect(mode));
+  }
+
+  if (interaction.isStringSelectMenu()) {
+    if (
+      interaction.customId !== 'kaufen_select' &&
+      interaction.customId !== 'verkaufen_select'
+    ) {
+      return;
+    }
+
+    const mode =
+      interaction.customId === 'kaufen_select'
+        ? 'kaufen'
+        : 'verkaufen';
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    });
+
+    return createTicketThread(
+      interaction,
+      mode,
+      interaction.values[0]
+    );
   }
 
   if (!interaction.isChatInputCommand()) return;
