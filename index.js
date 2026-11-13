@@ -1117,7 +1117,7 @@ async function deletePriceLog() {
 client.on(Events.InteractionCreate, async interaction => {
 
   if (interaction.customId === 'spawner_price_role') {
-  const roleId = process.env.SPAWNER_PRICE_ROLE_ID;
+  const roleId = process.env.SPAWNER_PING_ROLE_ID;
 
   if (!roleId) {
     return interaction.reply({
