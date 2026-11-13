@@ -118,6 +118,7 @@ client.once('clientReady', async () => {
 
 const SPAWNER_FILE = path.join(__dirname, 'spawners.json');
 const PANEL_FILE = path.join(__dirname, 'panel.json');
+const TICKETS_FILE = path.join(__dirname, 'tickets.json');
 
 function loadJSON(file, fallback) {
   try {
@@ -139,6 +140,9 @@ let spawners = loadJSON(SPAWNER_FILE, []);
 let panelData = loadJSON(PANEL_FILE, {
   channelId: null,
   messageId: null
+});
+let ticketData = loadJSON(TICKETS_FILE, {
+  count: 0
 });
 
 function formatPrice(price) {
@@ -372,6 +376,57 @@ function buildTicketModal(mode, spawnerName) {
 }
 
 
+function buildTicketEmbed(mode, spawner, ingameName, anzahl, tradeNumber, customerId) {
+  const titleLine =
+    mode === 'kaufen'
+      ? '🛒 • Spawner Kaufen'
+      : '💰 • Spawner Verkauf';
+
+  const relevantPrice =
+    mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+
+  const gesamtpreis =
+    relevantPrice === null
+      ? 'Stop'
+      : formatPrice(relevantPrice * anzahl);
+
+  const container = new ContainerBuilder();
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `## ${titleLine}\n` +
+      `🤝 • Handel #${tradeNumber}`
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder()
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `👤 **Kunde:** <@${customerId}>\n` +
+      `🎮 **ING:** \`${ingameName}\``
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder()
+  );
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `💥 **Spawner:** ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+      `📦 **Menge:** \`${anzahl}\`\n` +
+      `💵 **Preis/Stk:** \`${priceText(relevantPrice)}\`\n` +
+      `💰 **Gesamtpreis:** \`${gesamtpreis}\``
+    )
+  );
+
+  return container;
+}
+
+
 async function createTicketThread(interaction, mode, spawnerName, ingameName, anzahl) {
   const spawner = spawners.find(
     s => s.name.toLowerCase() === spawnerName.toLowerCase()
@@ -388,8 +443,7 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
     return;
   }
 
-  const actionLabel = mode === 'kaufen' ? 'Kauf' : 'Verkauf';
-  const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+  const actionLabel = mode === 'kaufen' ? 'Kaufen' : 'Verkauf';
 
   try {
     const panelChannel = await client.channels.fetch(
@@ -429,32 +483,19 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
       }
     }
 
+    ticketData.count += 1;
+    saveJSON(TICKETS_FILE, ticketData);
+
     await thread.send({
       components: [
-        new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `# 🎫 ${actionLabel}-Ticket: ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-              `Erstellt von: <@${interaction.user.id}>\n\n` +
-              `👤 **Ingame-Name:** \`${ingameName}\`\n` +
-              `📦 **Anzahl:** \`${anzahl}\`\n\n` +
-              (mode === 'kaufen'
-                ? `💰 **Kaufpreis (pro Stück):** \`${priceText(relevantPrice)}\`\n`
-                : `🛒 **Ankauf (pro Stück):** \`${priceText(relevantPrice)}\`\n`) +
-              `ℹ️ **Referenz:** Ankauf \`${priceText(spawner.ankauf)}\` / Verkauf \`${priceText(spawner.verkauf)}\`` +
-              (traderRole
-                ? `\n\n🔔 <@&${traderRole.id}> – ein Trader kümmert sich darum.`
-                : '')
-            )
-          )
-          .addSeparatorComponents(
-            new SeparatorBuilder()
-          )
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              '-# 💎 TRADE BOT • HUGOSMP TICKET'
-            )
-          )
+        buildTicketEmbed(
+          mode,
+          spawner,
+          ingameName,
+          anzahl,
+          ticketData.count,
+          interaction.user.id
+        )
       ],
       flags: MessageFlags.IsComponentsV2
     });
