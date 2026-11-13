@@ -1219,9 +1219,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
     const updated = await updateSpawnerPanel();
 
-    // Preisänderungen im Discord-Channel protokollieren
+// Preisänderungen im Discord-Channel protokollieren
 try {
-  const logChannelId = process.env.LOG_CHANNEL_ID;
+  const logChannelId = process.env.PRICE_LOG_CHANNEL_ID;
 
   if (logChannelId) {
     const logChannel = await client.channels.fetch(logChannelId);
@@ -1231,13 +1231,13 @@ try {
 
       if (ankauf !== undefined) {
         changes.push(
-          `🛒 **Ankauf:** ${priceText(oldAnkauf)} → ${priceText(spawner.ankauf)}`
+          `🛒 **Ankauf:** \`${priceText(oldAnkauf)}\` → \`${priceText(spawner.ankauf)}\``
         );
       }
 
       if (verkauf !== undefined) {
         changes.push(
-          `💰 **Verkauf:** ${priceText(oldVerkauf)} → ${priceText(spawner.verkauf)}`
+          `💰 **Verkauf:** \`${priceText(oldVerkauf)}\` → \`${priceText(spawner.verkauf)}\``
         );
       }
 
@@ -1248,12 +1248,37 @@ try {
       }
 
       if (changes.length > 0) {
+        const logContainer = new ContainerBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `# 💎 Spawner-Änderung\n` +
+              `### ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+              `Eine Änderung an den Spawner-Daten wurde vorgenommen.`
+            )
+          )
+          .addSeparatorComponents(
+            new SeparatorBuilder()
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `## 📊 Änderungen\n\n` +
+              changes.join('\n\n')
+            )
+          )
+          .addSeparatorComponents(
+            new SeparatorBuilder()
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `👤 **Geändert von:** <@${interaction.user.id}>\n` +
+              `🛡️ **Bereich:** TRADE Team\n` +
+              `-# TRADE • Spawner Trading System`
+            )
+          );
+
         await logChannel.send({
-          content:
-            `# 📊 Spawner-Preisänderung\n` +
-            `**Spawner:** ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n\n` +
-            changes.join('\n') +
-            `\n\n**Geändert von:** <@${interaction.user.id}>`
+          components: [logContainer],
+          flags: MessageFlags.IsComponentsV2
         });
       }
     }
