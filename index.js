@@ -114,12 +114,29 @@ client.once('clientReady', async () => {
 
   console.log(gradient('          ✨ TRADE BOT ONLINE ✨'));
 
+// Gespeicherten Price-Log-Timer wiederherstellen
+if (priceLogData.lastChangeAt) {
+  console.log('[PRICE LOG] Wiederherstelle Lösch-Timer...');
+  armPriceLogDeletion();
+}
+
 });
 
 
 const SPAWNER_FILE = path.join(__dirname, 'spawners.json');
 const PANEL_FILE = path.join(__dirname, 'panel.json');
 const TICKETS_FILE = path.join(__dirname, 'tickets.json');
+
+const PRICE_LOG_FILE = path.join(__dirname, 'price-log.json');
+const PRICE_LOG_TIMEOUT = 5 * 60 * 60 * 1000; // 5 Stunden
+let priceLogData = loadJSON(PRICE_LOG_FILE, {
+  channelId: null,
+  messageId: null,
+  lastChangeAt: null,
+  entries: []
+});
+
+let priceLogTimeout;
 
 function loadJSON(file, fallback) {
   try {
@@ -881,6 +898,221 @@ async function handleTicketCancel(interaction) {
   }, 5000);
 }
 
+function createPriceLogContainer() {
+  const container = new ContainerBuilder();
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      '# 💎 • SPAWNER PRICE CHANGES\n' +
+      '*Aktuelle Preisänderungen des TRADE Teams*\n' +
+      '||🔔 Spawner Ping aktiviert||'
+    )
+  );
+
+  container.addSeparatorComponents(
+    new SeparatorBuilder()
+  );
+
+  if (priceLogData.entries.length === 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        '*Keine aktuellen Preisänderungen.*'
+      )
+    );
+  }
+
+  for (const entry of [...priceLogData.entries].reverse()) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `## ${entry.emoji} ${entry.name}-Spawner\n` +
+        `${entry.changes.join('\n')}\n\n` +
+        `-# Geändert von <@${entry.changedBy}>`
+      )
+    );
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder()
+    );
+  }
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      `-# TRADE • Spawner Trading System • Automatisches Price-Log`
+    )
+  );
+
+  return container;
+}
+
+async function updatePriceLog(interaction, spawner, changes) {
+  const channelId = process.env.PRICE_LOG_CHANNEL_ID;
+  const roleId = process.env.SPAWNER_PING_ROLE_ID;
+
+  if (!channelId) {
+    console.error('[PRICE LOG] PRICE_LOG_CHANNEL_ID fehlt!');
+    return;
+  }
+
+  try {
+    const channel = await client.channels.fetch(channelId);
+
+    if (!channel?.isTextBased()) {
+      throw new Error('Price-Log-Channel nicht gefunden.');
+    }
+
+    // Vorhandenen Eintrag dieses Spawners aktualisieren
+    const existingIndex = priceLogData.entries.findIndex(
+      entry => entry.name.toLowerCase() === spawner.name.toLowerCase()
+    );
+
+    const newEntry = {
+      name: spawner.name,
+      emoji: spawner.emoji || '🔹',
+      changes,
+      changedBy: interaction.user.id,
+      changedAt: Date.now()
+    };
+
+    if (existingIndex !== -1) {
+      priceLogData.entries[existingIndex] = newEntry;
+    } else {
+      priceLogData.entries.push(newEntry);
+    }
+
+    // Maximal 10 Spawner im aktuellen Log anzeigen
+    priceLogData.entries = priceLogData.entries.slice(-10);
+
+    let message = null;
+
+    // Vorhandene Nachricht suchen
+    if (
+      priceLogData.messageId &&
+      priceLogData.channelId === channelId
+    ) {
+      try {
+        message = await channel.messages.fetch(
+          priceLogData.messageId
+        );
+      } catch {
+        message = null;
+      }
+    }
+
+    const components = [createPriceLogContainer()];
+
+    // Nachricht aktualisieren oder neu erstellen
+    if (message) {
+      await message.edit({
+        components
+      });
+
+      console.log('[PRICE LOG] Nachricht aktualisiert.');
+    } else {
+      message = await channel.send({
+        components,
+        flags: MessageFlags.IsComponentsV2
+      });
+
+      priceLogData.channelId = channelId;
+      priceLogData.messageId = message.id;
+
+      console.log('[PRICE LOG] Neue Nachricht erstellt.');
+    }
+
+    // Zeitpunkt der letzten Änderung speichern
+    priceLogData.lastChangeAt = Date.now();
+
+    saveJSON(PRICE_LOG_FILE, priceLogData);
+
+    // Alten Lösch-Timer zurücksetzen
+    armPriceLogDeletion();
+
+    // Spawner Ping versenden
+    if (roleId) {
+      try {
+        const pingMessage = await channel.send({
+          content:
+            `<@&${roleId}> 💎 Es gab eine Preisänderung bei ` +
+            `**${spawner.name}-Spawner**!`,
+          allowedMentions: {
+            roles: [roleId]
+          }
+        });
+
+        // Ping-Nachricht nach 5 Sekunden entfernen
+        setTimeout(async () => {
+          try {
+            await pingMessage.delete();
+          } catch {}
+        }, 5000);
+
+      } catch (error) {
+        console.error('[PRICE PING ERROR]', error);
+      }
+    }
+
+  } catch (error) {
+    console.error('[PRICE LOG ERROR]', error);
+  }
+}
+
+function armPriceLogDeletion() {
+  clearTimeout(priceLogTimeout);
+
+  const expiration =
+    priceLogData.lastChangeAt + PRICE_LOG_TIMEOUT;
+
+  const remaining = expiration - Date.now();
+
+  if (remaining <= 0) {
+    deletePriceLog();
+    return;
+  }
+
+  priceLogTimeout = setTimeout(() => {
+    deletePriceLog();
+  }, remaining);
+}
+
+
+async function deletePriceLog() {
+  try {
+    if (priceLogData.channelId && priceLogData.messageId) {
+      const channel = await client.channels.fetch(
+        priceLogData.channelId
+      );
+
+      if (channel?.isTextBased()) {
+        try {
+          const message = await channel.messages.fetch(
+            priceLogData.messageId
+          );
+
+          await message.delete();
+
+          console.log('[PRICE LOG] Nachricht automatisch gelöscht.');
+        } catch (error) {
+          if (error.code !== 10008) {
+            console.error('[PRICE LOG DELETE ERROR]', error);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[PRICE LOG DELETE ERROR]', error);
+  } finally {
+    clearTimeout(priceLogTimeout);
+
+    priceLogData = {
+      channelId: null,
+      messageId: null,
+      lastChangeAt: null,
+      entries: []
+    };
+
+    saveJSON(PRICE_LOG_FILE, priceLogData);
+  }
+}
 
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isAutocomplete()) {
@@ -1219,72 +1451,28 @@ client.on(Events.InteractionCreate, async interaction => {
 
     const updated = await updateSpawnerPanel();
 
-// Preisänderungen im Discord-Channel protokollieren
-try {
-  const logChannelId = process.env.LOG_CHANNEL_ID;
+const changes = [];
 
-  if (logChannelId) {
-    const logChannel = await client.channels.fetch(logChannelId);
+if (ankauf !== undefined) {
+  changes.push(
+    `🛒 **Ankauf:** \`${priceText(oldAnkauf)}\` → \`${priceText(spawner.ankauf)}\``
+  );
+}
 
-    if (logChannel?.isTextBased()) {
-      const changes = [];
+if (verkauf !== undefined) {
+  changes.push(
+    `💰 **Verkauf:** \`${priceText(oldVerkauf)}\` → \`${priceText(spawner.verkauf)}\``
+  );
+}
 
-      if (ankauf !== undefined) {
-        changes.push(
-          `🛒 **Ankauf:** \`${priceText(oldAnkauf)}\` → \`${priceText(spawner.ankauf)}\``
-        );
-      }
+if (emojiInput !== null && emojiInput.trim() !== '') {
+  changes.push(
+    `🎨 **Emoji:** ${oldEmoji} → ${spawner.emoji}`
+  );
+}
 
-      if (verkauf !== undefined) {
-        changes.push(
-          `💰 **Verkauf:** \`${priceText(oldVerkauf)}\` → \`${priceText(spawner.verkauf)}\``
-        );
-      }
-
-      if (emojiInput !== null && emojiInput.trim() !== '') {
-        changes.push(
-          `🎨 **Emoji:** ${oldEmoji} → ${spawner.emoji}`
-        );
-      }
-
-      if (changes.length > 0) {
-        const logContainer = new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `# 💎 Spawner-Änderung\n` +
-              `### ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
-              `Eine Änderung an den Spawner-Daten wurde vorgenommen.`
-            )
-          )
-          .addSeparatorComponents(
-            new SeparatorBuilder()
-          )
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `## 📊 Änderungen\n\n` +
-              changes.join('\n\n')
-            )
-          )
-          .addSeparatorComponents(
-            new SeparatorBuilder()
-          )
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `👤 **Geändert von:** <@${interaction.user.id}>\n` +
-              `🛡️ **Bereich:** TRADE Team\n` +
-              `-# TRADE • Spawner Trading System`
-            )
-          );
-
-        await logChannel.send({
-          components: [logContainer],
-          flags: MessageFlags.IsComponentsV2
-        });
-      }
-    }
-  }
-} catch (error) {
-  console.error('[PRICE LOG ERROR]', error);
+if (changes.length > 0) {
+  await updatePriceLog(interaction, spawner, changes);
 }
 
     await interaction.editReply({
