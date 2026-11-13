@@ -216,6 +216,13 @@ function resolveTraderRole(guild) {
   ) ?? null;
 }
 
+function isTraderMember(interaction, traderRole) {
+  return (
+    traderRole &&
+    interaction.member?.roles?.cache?.has(traderRole.id)
+  ) ?? false;
+}
+
 
 function createSpawnerPanel() {
   const container = new ContainerBuilder();
@@ -291,6 +298,21 @@ function createClaimButtonRow() {
       .setLabel('Abbrechen')
       .setEmoji('🗑️')
       .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+function createClaimedButtonRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ticket_sold')
+      .setLabel('Als angekauft markieren')
+      .setEmoji('✅')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('ticket_release')
+      .setLabel('Freigeben')
+      .setEmoji('🔓')
+      .setStyle(ButtonStyle.Primary)
   );
 }
 
@@ -414,10 +436,15 @@ function buildTicketEmbed(ticket) {
       ? '🛒 • Spawner Kaufen'
       : '💰 • Spawner Verkauf';
 
-  const statusLine =
-    ticket.claimedBy === null
-      ? '🔓 **Status:** Offen'
-      : `🔒 **Geclaimt von:** <@${ticket.claimedBy}>`;
+  let statusLine;
+
+  if (ticket.abgeschlossen) {
+    statusLine = '✅ **Trade abgeschlossen** – Ticket wird geschlossen.';
+  } else if (ticket.claimedBy === null) {
+    statusLine = '🔓 **Status:** Offen';
+  } else {
+    statusLine = `🔒 **Geclaimt von:** <@${ticket.claimedBy}>`;
+  }
 
   const container = new ContainerBuilder();
 
@@ -464,7 +491,34 @@ function buildTicketEmbed(ticket) {
 }
 
 function createTicketComponents(ticket) {
-  return [buildTicketEmbed(ticket), createClaimButtonRow()];
+  if (ticket.abgeschlossen) {
+    return [buildTicketEmbed(ticket)];
+  }
+
+  const buttonRow =
+    ticket.claimedBy === null
+      ? createClaimButtonRow()
+      : createClaimedButtonRow();
+
+  return [buildTicketEmbed(ticket), buttonRow];
+}
+
+async function updateTicketMessage(interaction, ticket) {
+  if (!ticket.messageId) {
+    return;
+  }
+
+  try {
+    const message = await interaction.channel.messages.fetch(
+      ticket.messageId
+    );
+
+    await message.edit({
+      components: createTicketComponents(ticket)
+    });
+  } catch (error) {
+    console.error('Ticket-Nachricht konnte nicht aktualisiert werden:', error);
+  }
 }
 
 
@@ -542,7 +596,8 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
       customerId: interaction.user.id,
       preisStk: relevantPrice,
       gesamtpreis,
-      claimedBy: null
+      claimedBy: null,
+      abgeschlossen: false
     };
 
     const ticketMessage = await thread.send({
@@ -577,25 +632,34 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
 }
 
 
-async function handleTicketClaim(interaction) {
+async function getTicketFromChannel(interaction) {
   const ticket = ticketData.tickets[interaction.channel.id];
 
   if (!ticket || !ticket.messageId) {
-    return interaction.reply({
+    await interaction.reply({
       components: [
         buildNotice('❌ Dieses Ticket konnte nicht gefunden werden.')
       ],
       flags: NOTICE_FLAGS
     });
+
+    return null;
+  }
+
+  return ticket;
+}
+
+
+async function handleTicketClaim(interaction) {
+  const ticket = await getTicketFromChannel(interaction);
+
+  if (!ticket) {
+    return;
   }
 
   const traderRole = resolveTraderRole(interaction.guild);
 
-  const isTrader =
-    traderRole &&
-    interaction.member?.roles?.cache?.has(traderRole.id);
-
-  if (!isTrader) {
+  if (!isTraderMember(interaction, traderRole)) {
     return interaction.reply({
       components: [
         buildNotice('❌ Nur Mitglieder der **Trader**-Rolle können einen Trade claimen.')
@@ -619,17 +683,7 @@ async function handleTicketClaim(interaction) {
 
   saveJSON(TICKETS_FILE, ticketData);
 
-  try {
-    const message = await interaction.channel.messages.fetch(
-      ticket.messageId
-    );
-
-    await message.edit({
-      components: createTicketComponents(ticket)
-    });
-  } catch (error) {
-    console.error('Ticket-Nachricht konnte nicht aktualisiert werden:', error);
-  }
+  await updateTicketMessage(interaction, ticket);
 
   return interaction.reply({
     components: [
@@ -640,13 +694,126 @@ async function handleTicketClaim(interaction) {
 }
 
 
-async function handleTicketCancel(interaction) {
-  const ticket = ticketData.tickets[interaction.channel.id];
+async function handleTicketRelease(interaction) {
+  const ticket = await getTicketFromChannel(interaction);
 
   if (!ticket) {
+    return;
+  }
+
+  if (ticket.claimedBy === null) {
     return interaction.reply({
       components: [
-        buildNotice('❌ Dieses Ticket konnte nicht gefunden werden.')
+        buildNotice('⚠️ Dieser Trade ist nicht geclaimt.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  const traderRole = resolveTraderRole(interaction.guild);
+
+  const allowed =
+    interaction.user.id === ticket.claimedBy ||
+    isTraderMember(interaction, traderRole);
+
+  if (!allowed) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Nur der Claimer oder ein **Trader** kann den Trade freigeben.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  const previousClaimer = ticket.claimedBy;
+
+  ticket.claimedBy = null;
+
+  saveJSON(TICKETS_FILE, ticketData);
+
+  await updateTicketMessage(interaction, ticket);
+
+  return interaction.reply({
+    components: [
+      buildNotice(
+        `🔓 <@${previousClaimer}> hat den Trade freigegeben. ` +
+        'Der Trade kann wieder geclaimt werden.'
+      )
+    ],
+    flags: NOTICE_FLAGS
+  });
+}
+
+
+async function handleTicketSold(interaction) {
+  const ticket = await getTicketFromChannel(interaction);
+
+  if (!ticket) {
+    return;
+  }
+
+  const traderRole = resolveTraderRole(interaction.guild);
+
+  if (!isTraderMember(interaction, traderRole)) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Nur Mitglieder der **Trader**-Rolle können den Trade als angekauft markieren.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  if (ticket.abgeschlossen) {
+    return interaction.reply({
+      components: [
+        buildNotice('⚠️ Dieser Trade wurde bereits abgeschlossen.')
+      ],
+      flags: NOTICE_FLAGS
+    });
+  }
+
+  ticket.abgeschlossen = true;
+
+  saveJSON(TICKETS_FILE, ticketData);
+
+  await updateTicketMessage(interaction, ticket);
+
+  await interaction.reply({
+    components: [
+      buildNotice(
+        `✅ <@${interaction.user.id}> hat den Trade als angekauft markiert.\n` +
+        '🗑️ Dieses Ticket wird in **5 Sekunden** geschlossen.'
+      )
+    ],
+    flags: NOTICE_FLAGS
+  });
+
+  setTimeout(async () => {
+    delete ticketData.tickets[interaction.channel.id];
+    saveJSON(TICKETS_FILE, ticketData);
+
+    try {
+      await interaction.channel.delete(
+        'Trade wurde abgeschlossen'
+      );
+    } catch (error) {
+      console.error('Ticket-Thread konnte nicht gelöscht werden:', error);
+    }
+  }, 5000);
+}
+
+
+async function handleTicketCancel(interaction) {
+  const ticket = await getTicketFromChannel(interaction);
+
+  if (!ticket) {
+    return;
+  }
+
+  if (ticket.abgeschlossen) {
+    return interaction.reply({
+      components: [
+        buildNotice('⚠️ Dieser Trade wurde bereits abgeschlossen.')
       ],
       flags: NOTICE_FLAGS
     });
@@ -707,6 +874,14 @@ client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isButton()) {
     if (interaction.customId === 'ticket_claim') {
       return handleTicketClaim(interaction);
+    }
+
+    if (interaction.customId === 'ticket_release') {
+      return handleTicketRelease(interaction);
+    }
+
+    if (interaction.customId === 'ticket_sold') {
+      return handleTicketSold(interaction);
     }
 
     if (interaction.customId === 'ticket_cancel') {
