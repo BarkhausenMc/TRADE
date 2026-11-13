@@ -338,7 +338,41 @@ function buildSpawnerSelect(mode) {
 }
 
 
-async function createTicketThread(interaction, mode, spawnerName) {
+function buildTicketModal(mode, spawnerName) {
+  const modal = new ModalBuilder()
+    .setCustomId(`ticket_modal|${mode}|${spawnerName}`)
+    .setTitle(
+      mode === 'kaufen'
+        ? 'Spawner Kaufen'
+        : 'Spawner Verkaufen'
+    );
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('ingame_name')
+        .setLabel('Dein Ingame-Name')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(2)
+        .setMaxLength(32)
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('anzahl')
+        .setLabel('Anzahl der Spawner')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(1)
+        .setMaxLength(6)
+        .setRequired(true)
+    )
+  );
+
+  return modal;
+}
+
+
+async function createTicketThread(interaction, mode, spawnerName, ingameName, anzahl) {
   const spawner = spawners.find(
     s => s.name.toLowerCase() === spawnerName.toLowerCase()
   );
@@ -356,7 +390,6 @@ async function createTicketThread(interaction, mode, spawnerName) {
 
   const actionLabel = mode === 'kaufen' ? 'Kauf' : 'Verkauf';
   const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
-  const priceLabel = mode === 'kaufen' ? 'Kaufpreis' : 'Verkaufserlös';
 
   try {
     const panelChannel = await client.channels.fetch(
@@ -368,7 +401,7 @@ async function createTicketThread(interaction, mode, spawnerName) {
     }
 
     const thread = await panelChannel.threads.create({
-      name: `${spawner.emoji || '🔹'} ${spawner.name}-Spawner • ${actionLabel}`,
+      name: `${spawner.emoji || '🔹'} ${spawner.name}-Spawner • ${actionLabel} • ${ingameName}`,
       autoArchiveDuration: 1440,
       type: ChannelType.PrivateThread,
       invitable: false,
@@ -403,10 +436,12 @@ async function createTicketThread(interaction, mode, spawnerName) {
             new TextDisplayBuilder().setContent(
               `# 🎫 ${actionLabel}-Ticket: ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
               `Erstellt von: <@${interaction.user.id}>\n\n` +
+              `👤 **Ingame-Name:** \`${ingameName}\`\n` +
+              `📦 **Anzahl:** \`${anzahl}\`\n\n` +
               (mode === 'kaufen'
-                ? `💰 **Kaufpreis:** ${priceText(relevantPrice)}\n`
-                : `🛒 **Ankauf:** ${priceText(relevantPrice)}\n`) +
-              `ℹ️ **Referenz:** Kauf ${priceText(spawner.ankauf)} / Verkauf ${priceText(spawner.verkauf)}` +
+                ? `💰 **Kaufpreis (pro Stück):** \`${priceText(relevantPrice)}\`\n`
+                : `🛒 **Ankauf (pro Stück):** \`${priceText(relevantPrice)}\`\n`) +
+              `ℹ️ **Referenz:** Ankauf \`${priceText(spawner.ankauf)}\` / Verkauf \`${priceText(spawner.verkauf)}\`` +
               (traderRole
                 ? `\n\n🔔 <@&${traderRole.id}> – ein Trader kümmert sich darum.`
                 : '')
@@ -514,6 +549,39 @@ client.on(Events.InteractionCreate, async interaction => {
         ? 'kaufen'
         : 'verkaufen';
 
+    const spawnerName = interaction.values[0];
+
+    return interaction.showModal(
+      buildTicketModal(mode, spawnerName)
+    );
+  }
+
+  if (interaction.isModalSubmit()) {
+    if (!interaction.customId.startsWith('ticket_modal|')) {
+      return;
+    }
+
+    const [, mode, spawnerName] = interaction.customId.split('|');
+
+    const ingameName = interaction.fields
+      .getTextInputValue('ingame_name')
+      .trim();
+
+    const anzahlRaw = interaction.fields
+      .getTextInputValue('anzahl')
+      .trim();
+
+    const anzahl = Number(anzahlRaw);
+
+    if (!Number.isInteger(anzahl) || anzahl < 1) {
+      return interaction.reply({
+        components: [
+          buildNotice('❌ Die Anzahl muss eine ganze Zahl größer als 0 sein.')
+        ],
+        flags: NOTICE_FLAGS
+      });
+    }
+
     await interaction.deferReply({
       flags: MessageFlags.Ephemeral
     });
@@ -521,7 +589,9 @@ client.on(Events.InteractionCreate, async interaction => {
     return createTicketThread(
       interaction,
       mode,
-      interaction.values[0]
+      spawnerName,
+      ingameName,
+      anzahl
     );
   }
 
@@ -648,8 +718,8 @@ client.on(Events.InteractionCreate, async interaction => {
           (added
             ? `✅ **${emoji} ${name}-Spawner** wurde hinzugefügt.`
             : `♻️ **${emoji} ${name}-Spawner** existiert bereits, Emoji aktualisiert.`) +
-          `\n🛒 **Ankauf:** ${priceText(existing ? existing.ankauf : null)}` +
-          `\n💰 **Verkauf:** ${priceText(existing ? existing.verkauf : null)}` +
+          `\n🛒 **Ankauf:** \`${priceText(existing ? existing.ankauf : null)}\`` +
+          `\n💰 **Verkauf:** \`${priceText(existing ? existing.verkauf : null)}\`` +
           (updated
             ? '\n\nDas Spawner-Panel wurde aktualisiert.'
             : '\n\n⚠️ Gespeichert, aber das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
@@ -732,8 +802,8 @@ client.on(Events.InteractionCreate, async interaction => {
       components: [
         buildNotice(
           `✅ Werte aktualisiert für **${spawner.emoji || '🔹'} ${spawner.name}-Spawner**\n` +
-          `🛒 **Ankauf:** ${priceText(spawner.ankauf)}\n` +
-          `💰 **Verkauf:** ${priceText(spawner.verkauf)}\n` +
+          `🛒 **Ankauf:** \`${priceText(spawner.ankauf)}\`\n` +
+          `💰 **Verkauf:** \`${priceText(spawner.verkauf)}\`` +
           (updated
             ? '\n\nDas Spawner-Panel wurde aktualisiert.'
             : '\n\n⚠️ Gespeichert, aber das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
@@ -784,7 +854,7 @@ client.on(Events.InteractionCreate, async interaction => {
             : '\n⚠️ Das Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.')
         )
       ],
-      flags: MessageFlags.IsComponentsV2
+      flags: NOTICE_FLAGS
     });
 
     return;
