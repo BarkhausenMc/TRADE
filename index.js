@@ -318,7 +318,7 @@ function createTicketButtonRow() {
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('spawner_price_role')
-      .setLabel('Price Rolle')
+      .setLabel('Spawer Ping Rolle')
       .setEmoji('🔔')
       .setStyle(ButtonStyle.Secondary)
   );
