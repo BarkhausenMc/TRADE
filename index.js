@@ -1,5 +1,7 @@
 require('dotenv').config();
 const chalk = require('chalk');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   Client,
