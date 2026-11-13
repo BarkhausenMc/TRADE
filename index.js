@@ -279,8 +279,7 @@ function createSpawnerPanel() {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      '-# 💎 TRADE BOT • HUGOSMP\n' +
-      '-# Preise können sich jederzeit ändern.'
+      '-# Preise werden und können jederzeit durch das TRADE Team geändert' 
     )
   );
 
