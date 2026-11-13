@@ -901,11 +901,13 @@ async function handleTicketCancel(interaction) {
 function createPriceLogContainer() {
   const container = new ContainerBuilder();
 
+  const roleId = process.env.SPAWNER_PING_ROLE_ID;
+
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      '# 💎 • SPAWNER PRICE CHANGES\n' +
-      '*Aktuelle Preisänderungen des TRADE Teams*\n' +
-      '||🔔 Spawner Ping aktiviert||'
+      `# 💎 • SPAWNER PRICE CHANGES\n` +
+      `*Aktuelle Preisänderungen des TRADE Teams*\n` +
+      (roleId ? `<@&${roleId}>` : '')
     )
   );
 
@@ -937,7 +939,7 @@ function createPriceLogContainer() {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `-# TRADE • Spawner Trading System • Automatisches Price-Log`
+      '-# TRADE • Spawner Trading System • Automatisches Price-Log'
     )
   );
 
@@ -1013,7 +1015,6 @@ async function updatePriceLog(interaction, spawner, changes) {
       console.log('[PRICE LOG] Nachricht aktualisiert.');
     } else {
       message = await channel.send({
-        content: pingContent,
         components,
         flags: MessageFlags.IsComponentsV2,
         allowedMentions: {
