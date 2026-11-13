@@ -2,6 +2,7 @@ require('dotenv').config();
 const chalk = require('chalk');
 const fs = require('node:fs');
 const path = require('node:path');
+const minecraft = require('./minecraft.js');
 
 const {
   Client,
@@ -1277,5 +1278,5 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
-
+minecraft.attach(client);
 client.login(process.env.DISCORD_BOT_TOKEN);
