@@ -905,7 +905,7 @@ function createPriceLogContainer() {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `## 💎 SPAWNER PRICE CHANGES\n` +
+      `## SPAWNER PRICE CHANGES\n` +
       (roleId ? `<@&${roleId}>` : '')
     )
   );
@@ -930,7 +930,12 @@ function createPriceLogContainer() {
         `-# Geändert von <@${entry.changedBy}>`
       )
     );
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder()
+    );
   }
+
   return container;
 }
 
