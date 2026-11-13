@@ -168,14 +168,14 @@ function createSpawnerPanel() {
     );
   }
 
-  for (const spawner of spawners) {
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## 🔹 ${spawner.name}-Spawner\n` +
-        `🟢 **Ankauf:** ${formatPrice(spawner.ankauf)}\n` +
-        `🔵 **Verkauf:** ${formatPrice(spawner.verkauf)}`
-      )
-    );
+    for (const spawner of spawners) {
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                `## ${spawner.emoji || '🔹'} ${spawner.name}-Spawner\n` +
+                `🛒 **Ankauf:** ${formatPrice(spawner.ankauf)}\n` +
+                `💰 **Verkauf:** ${formatPrice(spawner.verkauf)}`
+            )
+        )
 
     container.addSeparatorComponents(
       new SeparatorBuilder()
