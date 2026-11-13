@@ -128,7 +128,7 @@ const PANEL_FILE = path.join(__dirname, 'panel.json');
 const TICKETS_FILE = path.join(__dirname, 'tickets.json');
 
 const PRICE_LOG_FILE = path.join(__dirname, 'price-log.json');
-const PRICE_LOG_TIMEOUT = 5 * 60 * 60 * 1000; // 5 Stunden
+const PRICE_LOG_TIMEOUT = 5 * 60 * 1000;
 let priceLogData = loadJSON(PRICE_LOG_FILE, {
   channelId: null,
   messageId: null,
@@ -905,8 +905,7 @@ function createPriceLogContainer() {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `# 💎 • SPAWNER PRICE CHANGES\n` +
-      `*Aktuelle Preisänderungen des TRADE Teams*\n` +
+      `## 💎 SPAWNER PRICE CHANGES\n` +
       (roleId ? `<@&${roleId}>` : '')
     )
   );
@@ -931,18 +930,7 @@ function createPriceLogContainer() {
         `-# Geändert von <@${entry.changedBy}>`
       )
     );
-
-    container.addSeparatorComponents(
-      new SeparatorBuilder()
-    );
   }
-
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      '-# TRADE • Spawner Trading System • Automatisches Price-Log'
-    )
-  );
-
   return container;
 }
 
@@ -1040,7 +1028,7 @@ async function updatePriceLog(interaction, spawner, changes) {
     if (roleId) {
       try {
       const pingMessage = await channel.send({
-        content: `<@&${roleId}> 💎 Die Preise des ${spawner.name}-Spawners wurden aktualisiert!`,
+        content: `<@&${roleId}>`,
         allowedMentions: {
           roles: [roleId]
         }
