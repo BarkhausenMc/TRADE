@@ -218,11 +218,12 @@ function requireToken(req, res, next) {
 
 const app = express();
 app.use(express.json());
-app.use(requireToken);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
+
+app.use(requireToken);
 
 app.get('/api/me', (req, res) => {
   res.json(req.auth);

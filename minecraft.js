@@ -888,24 +888,60 @@ function attach(client) {
   client.on('interactionCreate', handleInteraction);
 }
 
+
 const db = require('./db.js');
 
 bot.on('whisper', (username, message) => {
-  const code = message.trim();
+  console.log(`[VERIFY] Whisper von ${username} empfangen.`);
 
-  if (!/^\d{6}$/.test(code)) return;
+  const code = String(message).trim();
 
-  const discordUserId = db.consumeVerifyCode(code);
-
-  if (!discordUserId) {
-    bot.whisper(username, 'Code ungültig oder abgelaufen. Hol dir über /verify einen neuen.');
+  if (!/^\d{6}$/.test(code)) {
+    console.log('[VERIFY] Nachricht ist kein 6-stelliger Code.');
     return;
   }
 
-  const token = db.issueJwt(discordUserId);
+  console.log('[VERIFY] 6-stelliger Code erkannt.');
 
-  bot.whisper(username, `Verifiziert! Dein JWT (24h gültig): ${token}`);
+  try {
+    const discordUserId = db.consumeVerifyCode(code);
+
+    if (!discordUserId) {
+      console.log('[VERIFY] Code ungültig oder abgelaufen.');
+
+      bot.whisper(
+        username,
+        'Code ungültig oder abgelaufen. Hol dir über Discord /verify einen neuen.'
+      );
+
+      return;
+    }
+
+    const token = db.issueJwt(discordUserId);
+
+    console.log(`[VERIFY] Discord-Account ${discordUserId} erfolgreich verifiziert.`);
+
+    bot.whisper(
+      username,
+      `Verifiziert! Dein JWT (24h gültig): ${token}`
+    );
+
+  } catch (error) {
+    console.error('[VERIFY ERROR]', error);
+
+    bot.whisper(
+      username,
+      'Bei der Verifizierung ist ein Fehler aufgetreten. Bitte versuche es erneut.'
+    );
+  }
 });
+
+
+bot.on('messagestr', (message, position) => {
+  console.log(`[MC MESSAGE] Position: ${position}`);
+  console.log(`[MC MESSAGE] ${message}`);
+});
+
 
 module.exports = {
   attach,
