@@ -105,23 +105,48 @@ export function registerInteractions(client) {
       return interaction.reply(buildSpawnerSelect(mode));
     }
 
-    if (interaction.isStringSelectMenu()) {
-      if (
-        interaction.customId !== 'kaufen_select' &&
-        interaction.customId !== 'verkaufen_select'
-      ) {
-        return;
-      }
+        if (interaction.isStringSelectMenu()) {
+        if (
+            interaction.customId !== 'kaufen_select' &&
+            interaction.customId !== 'verkaufen_select'
+        ) {
+            return;
+        }
 
-      const mode =
-        interaction.customId === 'kaufen_select'
-          ? 'kaufen'
-          : 'verkaufen';
+        const mode =
+            interaction.customId === 'kaufen_select'
+            ? 'kaufen'
+            : 'verkaufen';
 
-      const spawnerName = interaction.values[0];
+        const spawnerName = interaction.values[0];
 
-      return interaction.showModal(buildTicketModal(mode, spawnerName));
-    }
+        const spawner = spawners.find(
+            s => s.name.toLowerCase() === spawnerName.toLowerCase()
+        );
+
+        if (!spawner) {
+            return interaction.reply({
+            components: [buildNotice('❌ Dieser Spawner existiert nicht mehr. Bitte wähle erneut.')],
+            flags: noticeFlags
+            });
+        }
+
+        const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+
+        if (relevantPrice === null) {
+            return interaction.reply({
+            components: [
+                buildNotice(
+                `⚠️ **${spawner.emoji || '🔹'} ${spawner.name}-Spawner** wird derzeit ` +
+                (mode === 'kaufen' ? '**nicht verkauft** (Verkauf: Stop).' : '**nicht angekauft** (Ankauf: Stop).')
+                )
+            ],
+            flags: noticeFlags
+            });
+        }
+
+        return interaction.showModal(buildTicketModal(mode, spawnerName));
+        }
 
     if (interaction.isModalSubmit()) {
       if (!interaction.customId.startsWith('ticket_modal|')) {

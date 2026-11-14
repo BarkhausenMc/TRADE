@@ -111,6 +111,14 @@ function buildSimpleContainer(content) {
   );
 }
 
+async function replyTo(interaction, payload) {
+  if (interaction.deferred || interaction.replied) {
+    return interaction.editReply(payload);
+  }
+
+  return interaction.reply(payload);
+}
+
 async function handleInteraction(interaction) {
   if (interaction.isButton()) {
     const [action, requestId] = interaction.customId.split('_');
@@ -187,6 +195,7 @@ async function handleInteraction(interaction) {
   }
 
   if (!interaction.isChatInputCommand()) return;
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   if (interaction.commandName === 'msg') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
