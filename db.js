@@ -417,7 +417,6 @@ app.get('/login', (req, res) => {
 <br>
 <button onclick="startLogin()">Login starten</button>
 <p id="status"></p>
-<pre id="token" hidden></pre>
 <script>
 async function startLogin() {
   const name = document.getElementById('name').value.trim();
@@ -445,10 +444,14 @@ async function startLogin() {
     const msg = JSON.parse(event.data);
 
     if (msg.type === 'token') {
-      status.textContent = 'Login erfolgreich! Dein Token:';
-      const tokenEl = document.getElementById('token');
-      tokenEl.hidden = false;
-      tokenEl.textContent = msg.token;
+      localStorage.setItem('api_token', msg.token);
+
+      if (msg.expiresAt) {
+        localStorage.setItem('api_token_expires', String(msg.expiresAt));
+      }
+
+      status.innerHTML = '✅ Login erfolgreich! Token wurde gespeichert.';
+
     } else if (msg.type === 'error') {
       status.textContent = msg.error;
     }
