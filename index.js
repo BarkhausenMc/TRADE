@@ -149,6 +149,12 @@ function loadJSON(file, fallback) {
   return fallback;
 }
 
+let ticketData = loadJSON(TICKETS_FILE, {
+  count: 0,
+  completed: 0,
+  tickets: {}
+});
+
 function saveJSON(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
