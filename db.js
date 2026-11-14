@@ -104,11 +104,11 @@ function setPanel(channelId, messageId) {
 
 
 function requireToken(req, res, next) {
-
-console.log('Recv:', JSON.stringify(auth), '| Expected:', JSON.stringify(`Bearer ${token}`));
-
   const token = process.env.API_TOKEN;
   const auth = req.headers.authorization || '';
+
+  console.log('[API] Received:', JSON.stringify(auth));
+  console.log('[API] Expected:', JSON.stringify(`Bearer ${token}`));
 
   if (!token || auth !== `Bearer ${token}`) {
     return res.status(401).json({ error: 'Unauthorized' });
