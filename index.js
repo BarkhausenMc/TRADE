@@ -1104,6 +1104,7 @@ async function deletePriceLog() {
 
 client.on(Events.InteractionCreate, async interaction => {
 
+
   if (interaction.customId === 'spawner_price_role') {
   const roleId = process.env.SPAWNER_PING_ROLE_ID;
 
@@ -1312,6 +1313,25 @@ client.on(Events.InteractionCreate, async interaction => {
       });
     }
   }
+
+  if (interaction.commandName === 'verify') {
+  const code = db.createVerifyCode(interaction.user.id);
+
+  await interaction.reply({
+    components: [
+      new ContainerBuilder().addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `## 🔐 API-Verifizierung\n` +
+          `Dein Code:\n` +
+          `# \`${code}\`\n\n` +
+          `Sende diesen Code per \`/msg PHOENIX318 <code>\` an den Minecraft-Bot. Du erhältst danach dein JWT zurück.\n\n` +
+          `-# Gültig für 5 Minuten. Der Code funktioniert nur einmal.`
+        )
+      )
+    ],
+    flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2
+  });
+}
 
   if (interaction.commandName === 'setup-spawner') {
     await interaction.deferReply({
