@@ -644,9 +644,14 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
       abgeschlossen: false
     };
 
+    const mentionContainer = new ContainerBuilder().addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        traderRole ? `<@&${traderRole.id}>` : ''
+      )
+    );
+
     const ticketMessage = await thread.send({
-      content: traderRole ? `<@&${traderRole.id}>` : '',
-      components: createTicketComponents(ticket),
+      components: [mentionContainer, ...createTicketComponents(ticket)],
       flags: MessageFlags.IsComponentsV2,
       allowedMentions: {
         roles: traderRole ? [traderRole.id] : []
