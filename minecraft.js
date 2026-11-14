@@ -888,6 +888,24 @@ function attach(client) {
   client.on('interactionCreate', handleInteraction);
 }
 
+const db = require('./db.js');
+
+bot.on('whisper', (username, message) => {
+  const code = message.trim();
+
+  if (!/^\d{6}$/.test(code)) return;
+
+  const discordUserId = db.consumeVerifyCode(code);
+
+  if (!discordUserId) {
+    bot.whisper(username, 'Code ungültig oder abgelaufen. Hol dir über /verify einen neuen.');
+    return;
+  }
+
+  const token = db.issueJwt(discordUserId);
+
+  bot.whisper(username, `Verifiziert! Dein JWT (24h gültig): ${token}`);
+});
 
 module.exports = {
   attach,

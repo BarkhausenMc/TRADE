@@ -64,6 +64,10 @@ const commands = [
         .setAutocomplete(true)
     ),
 
+  new SlashCommandBuilder()
+    .setName('verify')
+    .setDescription('Erzeugt einen 6-stelligen Code für den API-Zugriff'),
+
   {
     name: 'msg',
     description: 'Send a private message to a Minecraft player',
@@ -130,7 +134,7 @@ const commands = [
       }
     ]
   },
-  {
+    {
     name: 'tpaccept',
     description: 'Accepts a Tpa from another Player',
     options: [
