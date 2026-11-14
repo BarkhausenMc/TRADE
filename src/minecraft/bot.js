@@ -116,7 +116,7 @@ async function replyTo(interaction, payload) {
     return interaction.editReply(payload);
   }
 
-  return interaction.reply(payload);
+  return replyTo(interaction,payload);
 }
 
 async function handleInteraction(interaction) {
@@ -126,7 +126,7 @@ async function handleInteraction(interaction) {
     if (action !== 'confirm' && action !== 'deny') return;
 
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to review payment requests.',
         flags: MessageFlags.Ephemeral
       });
@@ -138,7 +138,7 @@ async function handleInteraction(interaction) {
     if (!requestData || Date.now() > requestData.expiresAt) {
       pendingPayRequests.delete(requestId);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'This payment request has expired or is invalid.',
         flags: MessageFlags.Ephemeral
       });
@@ -170,7 +170,7 @@ async function handleInteraction(interaction) {
       } catch (error) {
         console.error('Payment execution failed:', error);
 
-        await interaction.reply({
+        await replyTo(interaction,{
           content: 'Payment failed. Minecraft bot may be disconnected.',
           flags: MessageFlags.Ephemeral
         });
@@ -199,7 +199,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'msg') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -212,7 +212,7 @@ async function handleInteraction(interaction) {
     const validationError = validateRequest(playerName, messageContent, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -224,12 +224,12 @@ async function handleInteraction(interaction) {
     try {
       bot.chat(`/msg ${playerName} ${messageContent}`);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Message sent to ${playerName}: "${messageContent}"`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -238,7 +238,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'chat') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -250,7 +250,7 @@ async function handleInteraction(interaction) {
     const validationError = validateChatRequest(text, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -262,12 +262,12 @@ async function handleInteraction(interaction) {
     try {
       bot.chat(text);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Message sent to Minecraft chat: "${text}"`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -276,7 +276,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'clan-chat') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -288,7 +288,7 @@ async function handleInteraction(interaction) {
     const validationError = validateChatRequest(text, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -300,12 +300,12 @@ async function handleInteraction(interaction) {
     try {
       bot.chat(`/c ${text}`);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Message sent to Clan chat: "${text}"`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -314,7 +314,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'clan-kick') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -326,7 +326,7 @@ async function handleInteraction(interaction) {
     const validationError = validateChatRequest(playerName, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -342,12 +342,12 @@ async function handleInteraction(interaction) {
         bot.chat(`/clan kick ${playerName} confirm`);
       }, 1100);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Player ${playerName} got kickt out of the Clan`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -356,7 +356,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'clan-invite') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -368,7 +368,7 @@ async function handleInteraction(interaction) {
     const validationError = validateChatRequest(playerName, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -380,12 +380,12 @@ async function handleInteraction(interaction) {
     try {
       bot.chat(`/clan invite ${playerName}`);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Player ${playerName} got invitet in to the Clan`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -394,7 +394,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'tpaccept') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -406,7 +406,7 @@ async function handleInteraction(interaction) {
     const validationError = validateChatRequest(playerName, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -418,12 +418,12 @@ async function handleInteraction(interaction) {
     try {
       bot.chat(`/tpaccept ${playerName}`);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Tpa got accepted`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -432,7 +432,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'pay') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -445,7 +445,7 @@ async function handleInteraction(interaction) {
     const validationError = validateChatRequest(amount, interaction.user.id);
 
     if (validationError) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: validationError,
         flags: MessageFlags.Ephemeral
       });
@@ -457,12 +457,12 @@ async function handleInteraction(interaction) {
     try {
       bot.chat(`/pay ${playerName} ${amount}`);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: `Player ${playerName} got ${amount} payed`,
         flags: MessageFlags.Ephemeral
       });
     } catch (error) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Failed to send message. Bot may be disconnected.',
         flags: MessageFlags.Ephemeral
       });
@@ -473,7 +473,7 @@ async function handleInteraction(interaction) {
     const member = await interaction.guild.members.fetch(interaction.user.id);
 
     if (!member.roles.cache.has(TRADER_ROLE_ID)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Only clan members can use this command.',
         flags: MessageFlags.Ephemeral
       });
@@ -485,7 +485,7 @@ async function handleInteraction(interaction) {
     const reason = interaction.options.getString('reason');
 
     if (!/^[a-zA-Z0-9_]{3,16}$/.test(player)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Invalid Minecraft username.',
         flags: MessageFlags.Ephemeral
       });
@@ -495,7 +495,7 @@ async function handleInteraction(interaction) {
     const amountString = rawAmount.replace(/^\$/, '');
 
     if (!/^\d+$/.test(amountString)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Invalid amount. Example: $100',
         flags: MessageFlags.Ephemeral
       });
@@ -505,7 +505,7 @@ async function handleInteraction(interaction) {
     const amount = Number(amountString);
 
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Amount must be between $1 and $1,000,000.',
         flags: MessageFlags.Ephemeral
       });
@@ -513,7 +513,7 @@ async function handleInteraction(interaction) {
     }
 
     if (!reason || reason.trim().length === 0) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Please provide a reason.',
         flags: MessageFlags.Ephemeral
       });
@@ -579,7 +579,7 @@ async function handleInteraction(interaction) {
     if (delivered === 0) {
       pendingPayRequests.delete(requestId);
 
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'Could not reach any reviewer via DM.',
         flags: MessageFlags.Ephemeral
       });
@@ -587,7 +587,7 @@ async function handleInteraction(interaction) {
       return;
     }
 
-    await interaction.reply({
+    await replyTo(interaction,{
       content: `Payment request sent to ${delivered} reviewer(s).`,
       flags: MessageFlags.Ephemeral
     });
@@ -602,7 +602,7 @@ async function handleInteraction(interaction) {
 
   if (interaction.commandName === 'clan-info') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
-      await interaction.reply({
+      await replyTo(interaction,{
         content: 'You are not authorized to use this command.',
         flags: MessageFlags.Ephemeral
       });
