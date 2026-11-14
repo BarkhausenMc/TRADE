@@ -480,8 +480,8 @@ function buildTicketModal(mode, spawnerName) {
 function buildTicketEmbed(ticket) {
   const titleLine =
     ticket.mode === 'kaufen'
-      ? '🛒 • Spawner Kaufen'
-      : '💰 • Spawner Verkauf';
+      ? '📥 • Spawner Verkauf'
+      : '📤 • Spawner Ankauf';
 
   let statusLine;
 
