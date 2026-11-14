@@ -748,7 +748,7 @@ async function handleTicketClaim(interaction) {
 
   await interaction.channel.send({
     components: [
-      buildNotice(`🙋 <@${interaction.user.id}> hat diesen Trade geclaimt.`)
+      buildNotice(`✅ <@${interaction.user.id}> hat diesen Trade geclaimt.`)
     ],
     flags: PUBLIC_FLAGS
   });
