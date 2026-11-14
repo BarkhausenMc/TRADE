@@ -2,6 +2,9 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const http = require('node:http');
+const { WebSocketServer } = require('ws');
+
 function getEncryptionKey() {
   const secret = process.env.JWT_ENCRYPTION_KEY;
 
@@ -62,6 +65,14 @@ const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS login_sessions (
+    session_id TEXT PRIMARY KEY,
+    minecraft_username TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+ );
   CREATE TABLE IF NOT EXISTS api_sessions (
     discord_user_id TEXT PRIMARY KEY,
     minecraft_username TEXT NOT NULL,
@@ -360,6 +371,94 @@ app.post('/api/internal/auth/complete', (req, res) => {
   }
 });
 
+app.post('/api/login', (req, res) => {
+  const ip = req.socket.remoteAddress;
+
+  if (isLoginRateLimited(ip)) {
+    return res.status(429).json({
+      error: 'Too many login attempts'
+    });
+  }
+
+  const minecraftUsername =
+    typeof req.body.minecraftUsername === 'string'
+      ? req.body.minecraftUsername.trim()
+      : '';
+
+  if (!/^[a-zA-Z0-9_]{3,16}$/.test(minecraftUsername)) {
+    return res.status(400).json({
+      error: 'Invalid Minecraft username'
+    });
+  }
+
+  const session = createLoginSession(minecraftUsername);
+
+  return res.json(session);
+});
+
+app.get('/login', (req, res) => {
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>TRADE API Login</title>
+<style>
+  body { font-family: sans-serif; background: #16171d; color: #eee; max-width: 560px; margin: 60px auto; padding: 0 20px; }
+  input, button { font-size: 1rem; padding: 10px; border-radius: 8px; border: none; }
+  input { width: 100%; box-sizing: border-box; background: #23252e; color: #eee; }
+  button { background: #6d4aff; color: #fff; cursor: pointer; margin-top: 10px; }
+  .code { font-size: 2rem; letter-spacing: 0.3em; color: #6d4aff; }
+  pre { background: #23252e; padding: 15px; border-radius: 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>TRADE API Login</h1>
+<input id="name" placeholder="Minecraft-Name">
+<br>
+<button onclick="startLogin()">Login starten</button>
+<p id="status"></p>
+<pre id="token" hidden></pre>
+<script>
+async function startLogin() {
+  const name = document.getElementById('name').value.trim();
+  const status = document.getElementById('status');
+
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ minecraftUsername: name })
+  });
+
+  if (!res.ok) {
+    status.textContent = 'Fehler: ' + (await res.json()).error;
+    return;
+  }
+
+  const data = await res.json();
+
+  status.innerHTML = 'Sende diesen Code im Spiel per <b>/msg JSK1905</b>:<br><span class="code">' + data.code + '</span>';
+
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host + '/ws?sessionId=' + encodeURIComponent(data.sessionId));
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === 'token') {
+      status.textContent = 'Login erfolgreich! Dein Token:';
+      const tokenEl = document.getElementById('token');
+      tokenEl.hidden = false;
+      tokenEl.textContent = msg.token;
+    } else if (msg.type === 'error') {
+      status.textContent = msg.error;
+    }
+  };
+}
+</script>
+</body>
+</html>`);
+});
+
 app.use(requireToken);
 
 app.get('/api/health', (req, res) => {
@@ -387,37 +486,155 @@ app.use((req, res) => {
 function startApi() {
   getOrCreateJwtSecret();
 
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server, path: '/ws' });
+
+  wss.on('connection', (socket, req) => {
+    const sessionId = new URL(req.url, 'http://localhost')
+      .searchParams.get('sessionId');
+    const session = sessionId ? getLoginSession(sessionId) : null;
+
+    if (!session || session.status !== 'pending' || Date.now() > session.expires_at) {
+      socket.send(JSON.stringify({
+        type: 'error',
+        error: 'Ungültige oder abgelaufene Session'
+      }));
+      socket.close();
+      return;
+    }
+
+    pendingLoginSockets.set(sessionId, socket);
+
+    socket.on('close', () => {
+      if (pendingLoginSockets.get(sessionId) === socket) {
+        pendingLoginSockets.delete(sessionId);
+      }
+    });
+
+    setTimeout(() => {
+      if (pendingLoginSockets.get(sessionId) === socket) {
+        try {
+          socket.send(JSON.stringify({
+            type: 'error',
+            error: 'Session abgelaufen'
+          }));
+          socket.close();
+        } catch {}
+        pendingLoginSockets.delete(sessionId);
+      }
+    }, session.expires_at - Date.now());
+  });
+
   const port = Number(process.env.API_PORT || 3000);
   const host = process.env.API_HOST || '127.0.0.1';
 
-  app.listen(port, host, () => {
+  server.listen(port, host, () => {
     console.log(`[API] http://${host}:${port} – JWT Authentication aktiviert.`);
   });
 }
 
-function getStoredJwt(discordUserId) {
-  const session = db.prepare(`
-    SELECT *
-    FROM api_sessions
-    WHERE discord_user_id = ?
-  `).get(discordUserId);
+const LOGIN_TTL_MS = 5 * 60 * 1000;
+const LOGIN_RATE_LIMIT_MS = 60 * 1000;
+const LOGIN_RATE_LIMIT_MAX = 5;
 
-  if (!session) return null;
+const loginAttempts = new Map();
+const pendingLoginSockets = new Map();
 
-  if (Date.now() >= session.expires_at) {
-    db.prepare(`
-      DELETE FROM api_sessions
-      WHERE discord_user_id = ?
-    `).run(discordUserId);
+function createLoginSession(minecraftUsername) {
+  db.prepare('DELETE FROM login_sessions WHERE expires_at < ?').run(Date.now());
+  db.prepare('DELETE FROM login_sessions WHERE minecraft_username = ?').run(minecraftUsername);
 
+  const sessionId = crypto.randomUUID();
+  const code = String(crypto.randomInt(100000, 1000000));
+  const now = Date.now();
+
+  db.prepare(`
+    INSERT INTO login_sessions (
+      session_id,
+      minecraft_username,
+      code,
+      status,
+      created_at,
+      expires_at
+    ) VALUES (?, ?, ?, 'pending', ?, ?)
+  `).run(sessionId, minecraftUsername, code, now, now + LOGIN_TTL_MS);
+
+  return {
+    sessionId,
+    code,
+    expiresInMs: LOGIN_TTL_MS
+  };
+}
+
+function getLoginSession(sessionId) {
+  return db.prepare(`
+    SELECT session_id, minecraft_username, code, status, expires_at
+    FROM login_sessions
+    WHERE session_id = ?
+  `).get(sessionId);
+}
+
+function resolveLoginCode(code) {
+  const row = db.prepare(`
+    SELECT session_id, minecraft_username, status, expires_at
+    FROM login_sessions
+    WHERE code = ?
+  `).get(code);
+
+  if (!row || row.status !== 'pending' || Date.now() > row.expires_at) {
     return null;
   }
 
-  return decryptJwt(
-    session.encrypted_token,
-    session.iv,
-    session.auth_tag
+  db.prepare("UPDATE login_sessions SET status = 'done' WHERE session_id = ?")
+    .run(row.session_id);
+
+  const secret = getOrCreateJwtSecret();
+  const token = jwt.sign(
+    {
+      sub: row.minecraft_username,
+      type: 'browser-login'
+    },
+    secret,
+    { expiresIn: process.env.API_JWT_EXPIRES || '24h' }
   );
+
+  const decoded = jwt.verify(token, secret);
+
+  return {
+    sessionId: row.session_id,
+    minecraftUsername: row.minecraft_username,
+    token,
+    expiresAt: decoded.exp
+  };
+}
+
+function sendToLoginSession(sessionId, data) {
+  const socket = pendingLoginSockets.get(sessionId);
+
+  if (!socket) {
+    return false;
+  }
+
+  try {
+    socket.send(JSON.stringify(data));
+    socket.close();
+    pendingLoginSockets.delete(sessionId);
+    return true;
+  } catch {
+    pendingLoginSockets.delete(sessionId);
+    return false;
+  }
+}
+
+function isLoginRateLimited(ip) {
+  const now = Date.now();
+  const attempts = (loginAttempts.get(ip) || [])
+    .filter(timestamp => now - timestamp < LOGIN_RATE_LIMIT_MS);
+
+  attempts.push(now);
+  loginAttempts.set(ip, attempts);
+
+  return attempts.length > LOGIN_RATE_LIMIT_MAX;
 }
 
 module.exports = {
@@ -429,5 +646,7 @@ module.exports = {
   consumeVerifyCode,
   issueJwt,
   getStoredJwt,
+  resolveLoginCode,
+  sendToLoginSession,
   startApi
 };
