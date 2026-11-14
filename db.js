@@ -191,30 +191,34 @@ function verifyJwt(token) {
 }
 
 
+
 function requireToken(req, res, next) {
   const auth = req.headers.authorization || '';
 
   if (!auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({
+      error: 'Unauthorized'
+    });
   }
 
-  const credential = auth.slice(7).trim();
-  const payload = verifyJwt(credential);
+  const token = auth.slice(7).trim();
+  const payload = verifyJwt(token);
 
-  if (payload) {
-    req.auth = { type: 'jwt', userId: payload.sub, expiresAt: payload.exp };
-    return next();
+  if (!payload) {
+    return res.status(401).json({
+      error: 'Invalid or expired JWT'
+    });
   }
 
-  const staticToken = process.env.API_TOKEN;
+  req.auth = {
+    type: 'jwt',
+    userId: payload.sub,
+    expiresAt: payload.exp
+  };
 
-  if (staticToken && credential === staticToken) {
-    req.auth = { type: 'token' };
-    return next();
-  }
-
-  return res.status(401).json({ error: 'Unauthorized' });
+  return next();
 }
+
 
 const app = express();
 app.use(express.json());
@@ -242,23 +246,18 @@ app.use((req, res) => {
 });
 
 
+
 function startApi() {
-  const token = process.env.API_TOKEN;
-
-  if (!token) {
-    console.warn('[API] Kein API_TOKEN in der .env gesetzt – API wird NICHT gestartet.');
-    return;
-  }
-
   getOrCreateJwtSecret();
 
   const port = Number(process.env.API_PORT || 3000);
   const host = process.env.API_HOST || '127.0.0.1';
 
   app.listen(port, host, () => {
-    console.log(`[API] http://${host}:${port} – Bearer Token oder JWT.`);
+    console.log(`[API] http://${host}:${port} – JWT Authentication aktiviert.`);
   });
 }
+
 
 
 module.exports = {
