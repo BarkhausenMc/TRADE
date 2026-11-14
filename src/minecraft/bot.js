@@ -632,7 +632,25 @@ async function handleInteraction(interaction) {
 
 export function attach(client) {
   discordClient = client;
-  client.on('interactionCreate', handleInteraction);
+
+  client.on('interactionCreate', async interaction => {
+    try {
+      await handleInteraction(interaction);
+    } catch (error) {
+      console.error('[INTERACTION ERROR]', error);
+
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ content: '❌ Interner Fehler.' });
+        } else {
+          await interaction.reply({
+            content: '❌ Interner Fehler.',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+      } catch {}
+    }
+  });
 }
 
 bot.on('messagestr', async (message, position) => {
