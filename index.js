@@ -588,7 +588,7 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
     return;
   }
 
-  const actionLabel = mode === 'kaufen' ? 'Kaufen' : 'Verkauf';
+  const actionLabel = mode === '📥 Verkauf' ? '📥 Verkauf' : '📤 Ankauf';
   const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
   const gesamtpreis =
     relevantPrice === null
