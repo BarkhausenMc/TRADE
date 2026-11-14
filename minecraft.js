@@ -889,37 +889,38 @@ function attach(client) {
 }
 
 
+
 const db = require('./db.js');
 
-bot.on('whisper', (username, message) => {
-  console.log(`[VERIFY] Whisper von ${username} empfangen.`);
+bot.on('messagestr', (message, position) => {
+  if (position !== 'system') return;
 
-  const code = String(message).trim();
+  // Nur private Nachrichten an unseren Bot verarbeiten
+  const match = message.match(
+    /^\[Nachricht\]\s+([a-zA-Z0-9_]{3,16})\s+->\s+Du:\s*(\d{6})\s*$/
+  );
 
-  if (!/^\d{6}$/.test(code)) {
-    console.log('[VERIFY] Nachricht ist kein 6-stelliger Code.');
-    return;
-  }
+  if (!match) return;
 
-  console.log('[VERIFY] 6-stelliger Code erkannt.');
+  const username = match[1];
+  const code = match[2];
+
+  console.log(`[VERIFY] Code von ${username} empfangen.`);
 
   try {
     const discordUserId = db.consumeVerifyCode(code);
 
     if (!discordUserId) {
-      console.log('[VERIFY] Code ungültig oder abgelaufen.');
-
       bot.whisper(
         username,
-        'Code ungültig oder abgelaufen. Hol dir über Discord /verify einen neuen.'
+        'Code ungültig oder abgelaufen. Bitte erstelle über Discord /verify einen neuen Code.'
       );
-
       return;
     }
 
     const token = db.issueJwt(discordUserId);
 
-    console.log(`[VERIFY] Discord-Account ${discordUserId} erfolgreich verifiziert.`);
+    console.log(`[VERIFY] ${username} erfolgreich verifiziert.`);
 
     bot.whisper(
       username,
@@ -931,10 +932,11 @@ bot.on('whisper', (username, message) => {
 
     bot.whisper(
       username,
-      'Bei der Verifizierung ist ein Fehler aufgetreten. Bitte versuche es erneut.'
+      'Bei der Verifizierung ist ein Fehler aufgetreten.'
     );
   }
 });
+
 
 
 bot.on('messagestr', (message, position) => {
