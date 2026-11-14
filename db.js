@@ -267,10 +267,17 @@ function requireToken(req, res, next) {
     });
   }
 
+  const session = db.prepare(`
+    SELECT minecraft_username, expires_at
+    FROM api_sessions
+    WHERE discord_user_id = ?
+  `).get(payload.sub);
+
   req.auth = {
     type: 'jwt',
     userId: payload.sub,
-    expiresAt: payload.exp
+    expiresAt: payload.exp,
+    minecraftUsername: session ? session.minecraft_username : null
   };
 
   return next();
