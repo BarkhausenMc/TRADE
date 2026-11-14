@@ -892,10 +892,10 @@ function attach(client) {
 
 const db = require('./db.js');
 
+
 bot.on('messagestr', (message, position) => {
   if (position !== 'system') return;
 
-  // Nur private Nachrichten an unseren Bot verarbeiten
   const match = message.match(
     /^\[Nachricht\]\s+([a-zA-Z0-9_]{3,16})\s+->\s+Du:\s*(\d{6})\s*$/
   );
@@ -911,31 +911,38 @@ bot.on('messagestr', (message, position) => {
     const discordUserId = db.consumeVerifyCode(code);
 
     if (!discordUserId) {
-      bot.whisper(
-        username,
-        'Code ungültig oder abgelaufen. Bitte erstelle über Discord /verify einen neuen Code.'
+      bot.chat(
+        `/msg ${username} Dein Code ist ungueltig oder abgelaufen. Bitte nutze Discord /verify erneut.`
       );
+
+      console.log(`[VERIFY] Ungueltiger Code von ${username}`);
       return;
     }
 
     const token = db.issueJwt(discordUserId);
 
     console.log(`[VERIFY] ${username} erfolgreich verifiziert.`);
+    console.log(`[VERIFY] Sende JWT an ${username}...`);
 
-    bot.whisper(
-      username,
-      `Verifiziert! Dein JWT (24h gültig): ${token}`
+    bot.chat(
+      `/msg ${username} Verifiziert! Dein JWT ist 24 Stunden gueltig: ${token}`
     );
+
+    console.log(`[VERIFY] JWT-Nachricht an ${username} gesendet.`);
 
   } catch (error) {
     console.error('[VERIFY ERROR]', error);
 
-    bot.whisper(
-      username,
-      'Bei der Verifizierung ist ein Fehler aufgetreten.'
-    );
+    try {
+      bot.chat(
+        `/msg ${username} Bei der Verifizierung ist ein Fehler aufgetreten.`
+      );
+    } catch (sendError) {
+      console.error('[VERIFY MESSAGE ERROR]', sendError);
+    }
   }
 });
+
 
 
 
