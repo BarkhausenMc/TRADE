@@ -2,6 +2,54 @@ require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+function getEncryptionKey() {
+  const secret = process.env.JWT_ENCRYPTION_KEY;
+
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_ENCRYPTION_KEY fehlt oder ist zu kurz.');
+  }
+
+  return crypto.scryptSync(
+    secret,
+    'tradebot-jwt-storage-v1',
+    32
+  );
+}
+
+function encryptJwt(token) {
+  const iv = crypto.randomBytes(12);
+
+  const cipher = crypto.createCipheriv(
+    'aes-256-gcm',
+    getEncryptionKey(),
+    iv
+  );
+
+  let encrypted = cipher.update(token, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+
+  return {
+    encrypted,
+    iv: iv.toString('hex'),
+    authTag: cipher.getAuthTag().toString('hex')
+  };
+}
+
+function decryptJwt(encrypted, iv, authTag) {
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    getEncryptionKey(),
+    Buffer.from(iv, 'hex')
+  );
+
+  decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  return decrypted;
+}
+
 const Database = require('better-sqlite3');
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -14,6 +62,15 @@ const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS api_sessions (
+    discord_user_id TEXT PRIMARY KEY,
+    minecraft_username TEXT NOT NULL,
+    encrypted_token TEXT NOT NULL,
+    iv TEXT NOT NULL,
+    auth_tag TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS spawners (
     name TEXT PRIMARY KEY,
     emoji TEXT,
@@ -223,11 +280,84 @@ function requireToken(req, res, next) {
 const app = express();
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
+app.post('/api/internal/auth/complete', (req, res) => {
+  try {
+    const internalSecret = process.env.INTERNAL_API_SECRET;
+
+    if (
+      !internalSecret ||
+      req.headers['x-internal-secret'] !== internalSecret
+    ) {
+      return res.status(401).json({
+        error: 'Unauthorized'
+      });
+    }
+
+    const {
+      discordUserId,
+      minecraftUsername,
+      token
+    } = req.body;
+
+    if (!discordUserId || !minecraftUsername || !token) {
+      return res.status(400).json({
+        error: 'Missing required fields'
+      });
+    }
+
+    const payload = verifyJwt(token);
+
+    if (!payload || payload.sub !== discordUserId) {
+      return res.status(401).json({
+        error: 'Invalid JWT'
+      });
+    }
+
+    const encrypted = encryptJwt(token);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO api_sessions (
+        discord_user_id,
+        minecraft_username,
+        encrypted_token,
+        iv,
+        auth_tag,
+        expires_at,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      discordUserId,
+      minecraftUsername,
+      encrypted.encrypted,
+      encrypted.iv,
+      encrypted.authTag,
+      payload.exp * 1000,
+      Date.now()
+    );
+
+    console.log(
+      `[API AUTH] ${minecraftUsername} erfolgreich gespeichert.`
+    );
+
+    return res.json({
+      success: true,
+      message: 'Account successfully authenticated'
+    });
+
+  } catch (error) {
+    console.error('[API AUTH ERROR]', error);
+
+    return res.status(500).json({
+      error: 'Authentication storage failed'
+    });
+  }
 });
 
 app.use(requireToken);
+
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true });
+});
 
 app.get('/api/me', (req, res) => {
   res.json(req.auth);
@@ -258,7 +388,30 @@ function startApi() {
   });
 }
 
+function getStoredJwt(discordUserId) {
+  const session = db.prepare(`
+    SELECT *
+    FROM api_sessions
+    WHERE discord_user_id = ?
+  `).get(discordUserId);
 
+  if (!session) return null;
+
+  if (Date.now() >= session.expires_at) {
+    db.prepare(`
+      DELETE FROM api_sessions
+      WHERE discord_user_id = ?
+    `).run(discordUserId);
+
+    return null;
+  }
+
+  return decryptJwt(
+    session.encrypted_token,
+    session.iv,
+    session.auth_tag
+  );
+}
 
 module.exports = {
   getSpawners,
@@ -268,5 +421,6 @@ module.exports = {
   createVerifyCode,
   consumeVerifyCode,
   issueJwt,
+  getStoredJwt,
   startApi
 };

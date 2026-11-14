@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mineflayer = require('mineflayer');
+let discordClient = null;
 
 const {
   ActionRowBuilder,
@@ -885,6 +886,7 @@ if (interaction.commandName === 'tpaccept') {
 
 
 function attach(client) {
+  discordClient = client;
   client.on('interactionCreate', handleInteraction);
 }
 
@@ -893,7 +895,8 @@ function attach(client) {
 const db = require('./db.js');
 
 
-bot.on('messagestr', (message, position) => {
+
+bot.on('messagestr', async (message, position) => {
   if (position !== 'system') return;
 
   const match = message.match(
@@ -919,32 +922,95 @@ bot.on('messagestr', (message, position) => {
       return;
     }
 
+    // JWT serverseitig erstellen
     const token = db.issueJwt(discordUserId);
 
-    console.log(`[VERIFY] ${username} erfolgreich verifiziert.`);
-    console.log(`[VERIFY] Sende JWT an ${username}...`);
+    console.log(`[VERIFY] JWT fuer ${username} erstellt.`);
 
-    bot.chat(
-      `/msg ${username} Verifiziert! Dein JWT ist 24 Stunden gueltig: ${token}`
+    // JWT an die interne API übertragen
+    const response = await fetch(
+      `http://127.0.0.1:${process.env.API_PORT || 3000}/api/internal/auth/complete`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.INTERNAL_API_SECRET
+        },
+        body: JSON.stringify({
+          discordUserId,
+          minecraftUsername: username,
+          token
+        })
+      }
     );
 
-    console.log(`[VERIFY] JWT-Nachricht an ${username} gesendet.`);
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.error || 'API authentication failed'
+      );
+    }
+
+    console.log(`[VERIFY] ${username} erfolgreich bei der API angemeldet.`);
+
+    // Minecraft-Bestätigung
+    bot.chat(
+      `/msg ${username} Du wurdest erfolgreich verifiziert! Dein API-Zugang ist jetzt aktiviert.`
+    );
+
+    // Discord-Bestätigung
+    try {
+      if (!discordClient) {
+        throw new Error('Discord client nicht verfügbar.');
+      }
+
+      const discordUser = await discordClient.users.fetch(
+        discordUserId
+      );
+
+      await discordUser.send({
+        embeds: [{
+          color: 0x57F287,
+          title: '✅ Verifizierung erfolgreich!',
+          description:
+            'Dein Account wurde erfolgreich mit deinem Minecraft-Account verbunden.',
+          fields: [
+            {
+              name: '🎮 Minecraft',
+              value: username,
+              inline: true
+            },
+            {
+              name: '🔐 API-Zugang',
+              value: 'Erfolgreich aktiviert',
+              inline: true
+            }
+          ],
+          footer: {
+            text: 'TRADE API • Authentication'
+          },
+          timestamp: new Date().toISOString()
+        }]
+      });
+
+      console.log(`[VERIFY] Discord-DM an ${discordUser.tag} gesendet.`);
+
+    } catch (discordError) {
+      console.error(
+        '[VERIFY DISCORD DM ERROR]',
+        discordError
+      );
+    }
 
   } catch (error) {
     console.error('[VERIFY ERROR]', error);
 
-    try {
-      bot.chat(
-        `/msg ${username} Bei der Verifizierung ist ein Fehler aufgetreten.`
-      );
-    } catch (sendError) {
-      console.error('[VERIFY MESSAGE ERROR]', sendError);
-    }
+    bot.chat(
+      `/msg ${username} Bei deiner Verifizierung ist ein Fehler aufgetreten. Bitte versuche es erneut oder kontaktiere das TRADE Team.`
+    );
   }
 });
-
-
-
 
 bot.on('messagestr', (message, position) => {
   console.log(`[MC MESSAGE] Position: ${position}`);
