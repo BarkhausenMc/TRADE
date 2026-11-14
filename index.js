@@ -588,7 +588,9 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
     return;
   }
 
-  const actionLabel = mode === '📥 Verkauf' ? '📥 Verkauf' : '📤 Ankauf';
+  const actionLabel = mode === 'kaufen'
+  ? '📥 Verkauf'
+  : '📤 Ankauf';
   const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
   const gesamtpreis =
     relevantPrice === null
@@ -612,16 +614,23 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
       reason: `Ticket: ${actionLabel} ${spawner.name}-Spawner (von ${interaction.user.tag})`
     });
 
-    const memberRows = await interaction.guild.members.fetch();
     const traderRole = resolveTraderRole(interaction.guild);
 
     const membersToAdd = new Set([interaction.user.id]);
 
     if (traderRole) {
-      for (const member of memberRows.values()) {
-        if (member.roles.cache.has(traderRole.id)) {
-          membersToAdd.add(member.id);
-        }
+      const traderMembers = traderRole.members;
+
+      for (const member of traderMembers.values()) {
+        membersToAdd.add(member.id);
+      }
+    }
+
+    for (const userId of membersToAdd) {
+      try {
+        await thread.members.add(userId);
+      } catch (error) {
+        console.error(`Konnte ${userId} nicht zum Ticket hinzufügen:`, error);
       }
     }
 
