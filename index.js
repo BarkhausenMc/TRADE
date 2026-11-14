@@ -1324,7 +1324,7 @@ client.on(Events.InteractionCreate, async interaction => {
           `## 🔐 API-Verifizierung\n` +
           `Dein Code:\n` +
           `# \`${code}\`\n\n` +
-          `Sende diesen Code per \`/msg PHOENIX318 <code>\` an den Minecraft-Bot. Du erhältst danach dein JWT zurück.\n\n` +
+          `Sende diesen Code per \`/msg JSK1905 <code>\` an den Minecraft-Bot. Du erhältst danach dein JWT zurück.\n\n` +
           `-# Gültig für 5 Minuten. Der Code funktioniert nur einmal.`
         )
       )
