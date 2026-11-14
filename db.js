@@ -645,7 +645,6 @@ module.exports = {
   createVerifyCode,
   consumeVerifyCode,
   issueJwt,
-  getStoredJwt,
   resolveLoginCode,
   sendToLoginSession,
   startApi
