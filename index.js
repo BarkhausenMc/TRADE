@@ -605,7 +605,7 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
     }
 
     const thread = await panelChannel.threads.create({
-      name: `${actionLabel} • ${spawner.emoji || '🔹'} ${spawner.name} • 📦 Menge: ${ticket.anzahl}`,
+      name: `${actionLabel} • ${spawner.emoji || '🔹'} ${spawner.name} • 📦 Menge: ${anzahl}`,
       autoArchiveDuration: 1440,
       type: ChannelType.PrivateThread,
       invitable: false,
