@@ -914,6 +914,24 @@ bot.on('messagestr', async (message, position) => {
     const discordUserId = db.consumeVerifyCode(code);
 
     if (!discordUserId) {
+      const login = db.resolveLoginCode(code);
+
+      if (login) {
+        db.sendToLoginSession(login.sessionId, {
+          type: 'token',
+          token: login.token,
+          minecraftUsername: login.minecraftUsername,
+          expiresAt: login.expiresAt
+        });
+
+        bot.chat(
+          `/msg ${username} Login erfolgreich! Dein Token wurde an den Browser gesendet.`
+        );
+
+        console.log(`[LOGIN] Browser-Login fuer ${login.minecraftUsername} abgeschlossen.`);
+        return;
+      }
+
       bot.chat(
         `/msg ${username} Dein Code ist ungueltig oder abgelaufen. Bitte nutze Discord /verify erneut.`
       );
