@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRADE API Login</title>
+<style>
+  body { font-family: sans-serif; background: #16171d; color: #eee; max-width: 560px; margin: 60px auto; padding: 0 20px; }
+  input, button { font-size: 1rem; padding: 10px; border-radius: 8px; border: none; }
+  input { width: 100%; box-sizing: border-box; background: #23252e; color: #eee; }
+  button { background: #6d4aff; color: #fff; cursor: pointer; margin-top: 10px; }
+  .code { font-size: 2rem; letter-spacing: 0.3em; color: #6d4aff; }
+  pre { background: #23252e; padding: 15px; border-radius: 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>TRADE API Login</h1>
+<input id="name" placeholder="Minecraft-Name">
+<br>
+<button onclick="startLogin()">Login starten</button>
+<p id="status"></p>
+<script>
+async function startLogin() {
+  const name = document.getElementById('name').value.trim();
+  const status = document.getElementById('status');
+
+  const res = await fetch('/trade/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ minecraftUsername: name })
+  });
+
+  if (!res.ok) {
+    status.textContent = 'Fehler: ' + (await res.json()).error;
+    return;
+  }
+
+  const data = await res.json();
+
+  status.innerHTML = 'Sende diesen Code im Spiel per <b>/msg JSK1905</b>:<br><span class="code">' + data.code + '</span>';
+
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host + '/trade/ws?sessionId=' + encodeURIComponent(data.sessionId));
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === 'token') {
+      localStorage.setItem('api_token', msg.token);
+
+      if (msg.expiresAt) {
+        localStorage.setItem('api_token_expires', String(msg.expiresAt));
+      }
+
+      status.innerHTML = '✅ Login erfolgreich! Token wurde gespeichert.';
+
+    } else if (msg.type === 'error') {
+      status.textContent = msg.error;
+    }
+  };
+}
+</script>
+</body>
+</html>

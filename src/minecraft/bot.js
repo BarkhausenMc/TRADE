@@ -1,18 +1,22 @@
-require('dotenv').config();
-const mineflayer = require('mineflayer');
-let discordClient = null;
+import 'dotenv/config';
+import mineflayer from 'mineflayer';
 
-const {
+import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  MessageFlags,
   ContainerBuilder,
   TextDisplayBuilder,
-  SeparatorBuilder
-} = require('discord.js');
+  MessageFlags
+} from 'discord.js';
 
-const AUTHORIZED_USER_IDS = (process.env.AUTHORIZED_USER_IDS || '').split(',').filter(id => id.trim());
+import { createClanInfoContainer, getClanInfo } from './clan-info.js';
+import { issueJwt, consumeVerifyCode } from '../db/database.js';
+import { resolveLoginCode, sendToLoginSession } from '../db/api-server.js';
+
+const AUTHORIZED_USER_IDS = (process.env.AUTHORIZED_USER_IDS || '')
+  .split(',')
+  .filter(id => id.trim());
 const TRADER_ROLE_ID = process.env.TRADER_ROLE_ID;
 
 const pendingPayRequests = new Map();
@@ -21,7 +25,9 @@ const messageHistory = new Map();
 const RATE_LIMIT_WINDOW_MS = 5000;
 const RATE_LIMIT_MAX_REQUESTS = 3;
 
-const bot = mineflayer.createBot({
+let discordClient = null;
+
+export const bot = mineflayer.createBot({
   host: 'hugosmp.net',
   port: 25565,
   username: 'JSK1905',
@@ -29,8 +35,7 @@ const bot = mineflayer.createBot({
   version: '1.21.4'
 });
 
-
-bot._client.on('add_resource_pack', (data) => {
+bot._client.on('add_resource_pack', data => {
   console.log(`Accept Server-Resource-Pack. url: ${data.url} , uuid: ${data.uuid}`);
   bot._client.write('resource_pack_receive', { uuid: data.uuid, result: 3 });
   bot._client.write('resource_pack_receive', { uuid: data.uuid, result: 0 });
@@ -43,263 +48,6 @@ bot.on('kicked', () => {
 bot.on('spawn', () => {
   console.log('Mineflayer bot spawned successfully');
 });
-
-
-function extractComponentText(component) {
-  if (!component) return '';
-
-  if (typeof component === 'string') {
-    return component;
-  }
-
-  if (Array.isArray(component)) {
-    return component.map(extractComponentText).join('');
-  }
-
-  if (typeof component !== 'object') return '';
-
-  let result = typeof component.text === 'string'
-    ? component.text
-    : '';
-
-  if (Array.isArray(component.extra)) {
-    result += component.extra
-      .map(extractComponentText)
-      .join('');
-  }
-
-  return result;
-}
-
-
-function extractRoleNames(text, startRegex, endRegex) {
-  const startMatch = startRegex.exec(text);
-
-  if (!startMatch) return [];
-
-  const startIndex = startMatch.index + startMatch[0].length;
-  const remaining = text.slice(startIndex);
-
-  const endMatch = endRegex.exec(remaining);
-
-  let section = endMatch
-    ? remaining.slice(0, endMatch.index)
-    : remaining;
-
-  section = section.replace(/^\s*\(\d+\)\s*:\s*/, '');
-
-  let names = section.split('•')
-    .map(name => name.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-
-  if (names.length === 1 && !section.includes('•')) {
-    names = [names[0].split(' ')[0]];
-  }
-
-  return names;
-}
-
-function parseClanInfo(text) {
-  const clan = {
-    name: text.match(/Name:\s*(.+)/)?.[1]?.trim() || 'Unknown',
-    tag: text.match(/Kürzel:\s*(.+)/)?.[1]?.trim() || 'Unknown',
-    created: text.match(/Erstelldatum:\s*(.+)/)?.[1]?.trim() || 'Unknown',
-    onlineTime: text.match(/Online-Zeit:\s*(.+)/)?.[1]?.trim() || 'Unknown',
-
-    leader: [],
-    coLeaders: [],
-    moderators: [],
-    members: []
-  };
-
-  clan.leader = extractRoleNames(
-    text,
-    /Leader:\s*/,
-    /Co-Leader\s*\(\d+\)\s*:/
-  );
-
-  clan.coLeaders = extractRoleNames(
-    text,
-    /Co-Leader\s*\(\d+\)\s*:\s*/,
-    /Moderatoren\s*\(\d+\)\s*:/
-  );
-
-  clan.moderators = extractRoleNames(
-    text,
-    /Moderatoren\s*\(\d+\)\s*:\s*/,
-    /Mitglieder\s*\(\d+\)\s*:/
-  );
-
-  clan.members = extractRoleNames(
-    text,
-    /Mitglieder\s*\(\d+\)\s*:\s*/,
-    /$^/
-  );
-
-  return clan;
-}
-
-function getClanInfo() {
-  return new Promise((resolve, reject) => {
-
-    if (!bot.player) {
-      return reject(new Error('Minecraft bot is not connected.'));
-    }
-
-    let finished = false;
-    let responseTimer;
-    let timeout;
-
-    function cleanup() {
-      clearTimeout(timeout);
-      clearTimeout(responseTimer);
-      bot.removeListener('message', messageHandler);
-    }
-
-    function finish(error, result) {
-      if (finished) return;
-
-      finished = true;
-      cleanup();
-
-      if (error) {
-        reject(error);
-      } else {
-        resolve(result);
-      }
-    }
-
-    function messageHandler(jsonMsg, position) {
-      if (position !== 'system') return;
-
-      const component = jsonMsg?.json ?? jsonMsg;
-
-      const text = extractComponentText(component)
-        || (typeof jsonMsg?.toString === 'function'
-          ? jsonMsg.toString()
-          : '');
-
-      if (!text.includes('Clan-Informationen')) return;
-
-      console.log('[CLAN INFO] Clan response received:');
-      console.log(text);
-
-      clearTimeout(responseTimer);
-
-      responseTimer = setTimeout(() => {
-        try {
-          const clan = parseClanInfo(text);
-
-          if (!clan.name || clan.name === 'Unknown') {
-            return finish(
-              new Error('Could not parse clan name.')
-            );
-          }
-
-          finish(null, clan);
-        } catch (error) {
-          finish(error);
-        }
-      }, 300);
-    }
-
-    bot.on('message', messageHandler);
-
-    timeout = setTimeout(() => {
-      finish(new Error('Clan information timed out.'));
-    }, 10000);
-
-    try {
-      console.log('[CLAN INFO] Executing /clan info');
-      bot.chat('/clan info');
-    } catch (error) {
-      finish(error);
-    }
-  });
-}
-
-
-function createClanInfoContainer(clan) {
-  const totalMembers =
-    clan.leader.length +
-    clan.coLeaders.length +
-    clan.moderators.length +
-    clan.members.length;
-
-  const formatPlayers = (players) => {
-    if (!players.length) return '- Keine';
-
-    return players
-      .map(player => `• ${player}`)
-      .join('\n');
-  };
-
-  const container = new ContainerBuilder()
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `# ⚔️ Clan Information\n` +
-        `### 🏷️ ${clan.name} [${clan.tag}]\n` +
-        `Welcome to the clan overview!`
-      )
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `**📅 Created:** \`${clan.created}\`\n` +
-        `**⏱️ Online Time:** \`${clan.onlineTime}\`\n` +
-        `**👥 Total Members:** \`${totalMembers}\``
-      )
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## 👑 Leader (${clan.leader.length})\n` +
-        `${formatPlayers(clan.leader)}`
-      )
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## 🛡️ Co-Leaders (${clan.coLeaders.length})\n` +
-        `${formatPlayers(clan.coLeaders)}`
-      )
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## 🔨 Moderators (${clan.moderators.length})\n` +
-        `${formatPlayers(clan.moderators)}`
-      )
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `## ⚔️ Members (${clan.members.length})\n` +
-        `${formatPlayers(clan.members)}`
-      )
-    )
-    .addSeparatorComponents(
-      new SeparatorBuilder()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(
-        `-# Trading Clan • \`[TRADE]\``
-      )
-    );
-
-  return container;
-}
-
 
 function validateRequest(playerName, messageContent, userId) {
   if (!playerName || playerName.trim().length === 0) {
@@ -322,7 +70,10 @@ function validateRequest(playerName, messageContent, userId) {
     return null;
   }
 
-  const requestCount = Math.floor((Date.now() - messageHistory.get(userId)) / RATE_LIMIT_WINDOW_MS);
+  const requestCount = Math.floor(
+    (Date.now() - messageHistory.get(userId)) / RATE_LIMIT_WINDOW_MS
+  );
+
   if (requestCount >= RATE_LIMIT_MAX_REQUESTS) {
     return 'Rate limit exceeded. Please wait before sending another message.';
   }
@@ -343,7 +94,10 @@ function validateChatRequest(text, userId) {
     return null;
   }
 
-  const requestCount = Math.floor((Date.now() - messageHistory.get(userId)) / RATE_LIMIT_WINDOW_MS);
+  const requestCount = Math.floor(
+    (Date.now() - messageHistory.get(userId)) / RATE_LIMIT_WINDOW_MS
+  );
+
   if (requestCount >= RATE_LIMIT_MAX_REQUESTS) {
     return 'Rate limit exceeded. Please wait before sending another message.';
   }
@@ -351,11 +105,14 @@ function validateChatRequest(text, userId) {
   return null;
 }
 
+function buildSimpleContainer(content) {
+  return new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(content)
+  );
+}
 
 async function handleInteraction(interaction) {
-
   if (interaction.isButton()) {
-
     const [action, requestId] = interaction.customId.split('_');
 
     if (action !== 'confirm' && action !== 'deny') return;
@@ -381,7 +138,6 @@ async function handleInteraction(interaction) {
     }
 
     if (action === 'confirm') {
-
       try {
         if (!bot.player) {
           throw new Error('Minecraft bot is not connected.');
@@ -391,26 +147,19 @@ async function handleInteraction(interaction) {
 
         pendingPayRequests.delete(requestId);
 
-        const container = new ContainerBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `# ✅ Payment Confirmed & Sent\n\n` +
-              `**Confirmed by:** ${interaction.user.tag}\n\n` +
-              `**Requested by:** ${requestData.userName}\n\n` +
-              `**Recipient:** ${requestData.player}\n\n` +
-              `**Amount:** $${requestData.amount}\n\n` +
-              `**Reason:** ${requestData.reason}\n\n` +
-              `**Minecraft Command:**\n` +
-              `\`/pay ${requestData.player} ${requestData.amount}\``
-            )
-          );
+        const container = buildSimpleContainer(
+          `# ✅ Payment Confirmed & Sent\n\n` +
+          `**Confirmed by:** ${interaction.user.tag}\n\n` +
+          `**Requested by:** ${requestData.userName}\n\n` +
+          `**Recipient:** ${requestData.player}\n\n` +
+          `**Amount:** $${requestData.amount}\n\n` +
+          `**Reason:** ${requestData.reason}\n\n` +
+          `**Minecraft Command:**\n` +
+          `\`/pay ${requestData.player} ${requestData.amount}\``
+        );
 
-        await interaction.update({
-          components: [container]
-        });
-
+        await interaction.update({ components: [container] });
       } catch (error) {
-
         console.error('Payment execution failed:', error);
 
         await interaction.reply({
@@ -418,27 +167,20 @@ async function handleInteraction(interaction) {
           flags: MessageFlags.Ephemeral
         });
       }
-
     } else if (action === 'deny') {
-
       pendingPayRequests.delete(requestId);
 
-      const container = new ContainerBuilder()
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            `# ❌ Payment Request Denied\n\n` +
-            `**Denied by:** ${interaction.user.tag}\n\n` +
-            `**Requested by:** ${requestData.userName}\n\n` +
-            `**Recipient:** ${requestData.player}\n\n` +
-            `**Amount:** $${requestData.amount}\n\n` +
-            `**Reason:** ${requestData.reason}\n\n` +
-            `No Minecraft payment was executed.`
-          )
-        );
+      const container = buildSimpleContainer(
+        `# ❌ Payment Request Denied\n\n` +
+        `**Denied by:** ${interaction.user.tag}\n\n` +
+        `**Requested by:** ${requestData.userName}\n\n` +
+        `**Recipient:** ${requestData.player}\n\n` +
+        `**Amount:** $${requestData.amount}\n\n` +
+        `**Reason:** ${requestData.reason}\n\n` +
+        `No Minecraft payment was executed.`
+      );
 
-      await interaction.update({
-        components: [container]
-      });
+      await interaction.update({ components: [container] });
     }
 
     return;
@@ -459,6 +201,7 @@ async function handleInteraction(interaction) {
     const messageContent = interaction.options.getString('nachricht');
 
     const validationError = validateRequest(playerName, messageContent, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -496,6 +239,7 @@ async function handleInteraction(interaction) {
     const text = interaction.options.getString('text');
 
     const validationError = validateChatRequest(text, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -533,6 +277,7 @@ async function handleInteraction(interaction) {
     const text = interaction.options.getString('text');
 
     const validationError = validateChatRequest(text, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -570,6 +315,7 @@ async function handleInteraction(interaction) {
     const playerName = interaction.options.getString('player');
 
     const validationError = validateChatRequest(playerName, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -611,6 +357,7 @@ async function handleInteraction(interaction) {
     const playerName = interaction.options.getString('player');
 
     const validationError = validateChatRequest(playerName, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -636,7 +383,7 @@ async function handleInteraction(interaction) {
     }
   }
 
-if (interaction.commandName === 'tpaccept') {
+  if (interaction.commandName === 'tpaccept') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
       await interaction.reply({
         content: 'You are not authorized to use this command.',
@@ -648,6 +395,7 @@ if (interaction.commandName === 'tpaccept') {
     const playerName = interaction.options.getString('player');
 
     const validationError = validateChatRequest(playerName, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -686,6 +434,7 @@ if (interaction.commandName === 'tpaccept') {
     const playerName = interaction.options.getString('player');
 
     const validationError = validateChatRequest(amount, interaction.user.id);
+
     if (validationError) {
       await interaction.reply({
         content: validationError,
@@ -712,7 +461,6 @@ if (interaction.commandName === 'tpaccept') {
   }
 
   if (interaction.commandName === 'pay-request') {
-
     const member = await interaction.guild.members.fetch(interaction.user.id);
 
     if (!member.roles.cache.has(TRADER_ROLE_ID)) {
@@ -775,18 +523,16 @@ if (interaction.commandName === 'tpaccept') {
       expiresAt: Date.now() + 300000
     });
 
-    const buttonRow = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(`confirm_${requestId}`)
-          .setLabel('Confirm Payment')
-          .setStyle(ButtonStyle.Success),
-
-        new ButtonBuilder()
-          .setCustomId(`deny_${requestId}`)
-          .setLabel('Deny')
-          .setStyle(ButtonStyle.Danger)
-      );
+    const buttonRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`confirm_${requestId}`)
+        .setLabel('Confirm Payment')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`deny_${requestId}`)
+        .setLabel('Deny')
+        .setStyle(ButtonStyle.Danger)
+    );
 
     const container = new ContainerBuilder()
       .addTextDisplayComponents(
@@ -807,7 +553,6 @@ if (interaction.commandName === 'tpaccept') {
     let delivered = 0;
 
     for (const adminId of AUTHORIZED_USER_IDS) {
-
       try {
         const admin = await interaction.client.users.fetch(adminId);
 
@@ -817,14 +562,12 @@ if (interaction.commandName === 'tpaccept') {
         });
 
         delivered++;
-
       } catch (error) {
         console.error(`Could not DM ${adminId}:`, error);
       }
     }
 
     if (delivered === 0) {
-
       pendingPayRequests.delete(requestId);
 
       await interaction.reply({
@@ -841,17 +584,14 @@ if (interaction.commandName === 'tpaccept') {
     });
 
     setTimeout(() => {
-
       if (pendingPayRequests.has(requestId)) {
         pendingPayRequests.delete(requestId);
         console.log(`Pay request ${requestId} expired`);
       }
-
     }, 300000);
   }
 
   if (interaction.commandName === 'clan-info') {
-
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
       await interaction.reply({
         content: 'You are not authorized to use this command.',
@@ -860,12 +600,10 @@ if (interaction.commandName === 'tpaccept') {
       return;
     }
 
-    await interaction.deferReply({
-      flags: MessageFlags.Ephemeral
-    });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      const clan = await getClanInfo();
+      const clan = await getClanInfo(bot);
 
       const container = createClanInfoContainer(clan);
 
@@ -873,7 +611,6 @@ if (interaction.commandName === 'tpaccept') {
         components: [container],
         flags: MessageFlags.IsComponentsV2
       });
-
     } catch (error) {
       console.error('[CLAN INFO ERROR]', error);
 
@@ -884,17 +621,10 @@ if (interaction.commandName === 'tpaccept') {
   }
 }
 
-
-function attach(client) {
+export function attach(client) {
   discordClient = client;
   client.on('interactionCreate', handleInteraction);
 }
-
-
-
-const db = require('./db.js');
-
-
 
 bot.on('messagestr', async (message, position) => {
   if (position !== 'system') return;
@@ -911,13 +641,13 @@ bot.on('messagestr', async (message, position) => {
   console.log(`[VERIFY] Code von ${username} empfangen.`);
 
   try {
-    const discordUserId = db.consumeVerifyCode(code);
+    const discordUserId = consumeVerifyCode(code);
 
     if (!discordUserId) {
-      const login = db.resolveLoginCode(code);
+      const login = resolveLoginCode(code);
 
       if (login) {
-        db.sendToLoginSession(login.sessionId, {
+        sendToLoginSession(login.sessionId, {
           type: 'token',
           token: login.token,
           minecraftUsername: login.minecraftUsername,
@@ -940,12 +670,10 @@ bot.on('messagestr', async (message, position) => {
       return;
     }
 
-    // JWT serverseitig erstellen
-    const token = db.issueJwt(discordUserId);
+    const token = issueJwt(discordUserId);
 
     console.log(`[VERIFY] JWT fuer ${username} erstellt.`);
 
-    // JWT an die interne API übertragen
     const response = await fetch(
       `http://127.0.0.1:${process.env.API_PORT || 3000}/api/internal/auth/complete`,
       {
@@ -965,62 +693,43 @@ bot.on('messagestr', async (message, position) => {
     const result = await response.json();
 
     if (!response.ok || !result.success) {
-      throw new Error(
-        result.error || 'API authentication failed'
-      );
+      throw new Error(result.error || 'API authentication failed');
     }
 
     console.log(`[VERIFY] ${username} erfolgreich bei der API angemeldet.`);
 
-    // Minecraft-Bestätigung
     bot.chat(
       `/msg ${username} Du wurdest erfolgreich verifiziert! Dein API-Zugang ist jetzt aktiviert.`
     );
 
-    // Discord-Bestätigung
     try {
       if (!discordClient) {
         throw new Error('Discord client nicht verfügbar.');
       }
 
-      const discordUser = await discordClient.users.fetch(
-        discordUserId
-      );
+      const discordUser = await discordClient.users.fetch(discordUserId);
 
       await discordUser.send({
-        embeds: [{
-          color: 0x57F287,
-          title: '✅ Verifizierung erfolgreich!',
-          description:
-            'Dein Account wurde erfolgreich mit deinem Minecraft-Account verbunden.',
-          fields: [
-            {
-              name: '🎮 Minecraft',
-              value: username,
-              inline: true
-            },
-            {
-              name: '🔐 API-Zugang',
-              value: 'Erfolgreich aktiviert',
-              inline: true
-            }
-          ],
-          footer: {
-            text: 'TRADE API • Authentication'
-          },
-          timestamp: new Date().toISOString()
-        }]
+        embeds: [
+          {
+            color: 0x57f287,
+            title: '✅ Verifizierung erfolgreich!',
+            description:
+              'Dein Account wurde erfolgreich mit deinem Minecraft-Account verbunden.',
+            fields: [
+              { name: '🎮 Minecraft', value: username, inline: true },
+              { name: '🔐 API-Zugang', value: 'Erfolgreich aktiviert', inline: true }
+            ],
+            footer: { text: 'TRADE API • Authentication' },
+            timestamp: new Date().toISOString()
+          }
+        ]
       });
 
       console.log(`[VERIFY] Discord-DM an ${discordUser.tag} gesendet.`);
-
     } catch (discordError) {
-      console.error(
-        '[VERIFY DISCORD DM ERROR]',
-        discordError
-      );
+      console.error('[VERIFY DISCORD DM ERROR]', discordError);
     }
-
   } catch (error) {
     console.error('[VERIFY ERROR]', error);
 
@@ -1034,9 +743,3 @@ bot.on('messagestr', (message, position) => {
   console.log(`[MC MESSAGE] Position: ${position}`);
   console.log(`[MC MESSAGE] ${message}`);
 });
-
-
-module.exports = {
-  attach,
-  bot
-};

@@ -1,10 +1,6 @@
-require('dotenv').config();
+import 'dotenv/config';
 
-const {
-  REST,
-  Routes,
-  SlashCommandBuilder
-} = require('discord.js');
+import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 
 const commands = [
   new SlashCommandBuilder()
@@ -15,16 +11,10 @@ const commands = [
     .setName('spawner-hinzufuegen')
     .setDescription('Fügt einen neuen Spawner hinzu')
     .addStringOption(option =>
-      option
-        .setName('name')
-        .setDescription('Name des Spawners')
-        .setRequired(true)
+      option.setName('name').setDescription('Name des Spawners').setRequired(true)
     )
     .addStringOption(option =>
-      option
-        .setName('emoji')
-        .setDescription('Emoji des Spawners')
-        .setRequired(true)
+      option.setName('emoji').setDescription('Emoji des Spawners').setRequired(true)
     ),
 
   new SlashCommandBuilder()
@@ -38,19 +28,13 @@ const commands = [
         .setAutocomplete(true)
     )
     .addStringOption(option =>
-      option
-        .setName('ankauf')
-        .setDescription('Ankauf in Mio. oder "stop"')
+      option.setName('ankauf').setDescription('Ankauf in Mio. oder "stop"')
     )
     .addStringOption(option =>
-      option
-        .setName('verkauf')
-        .setDescription('Verkauf in Mio. oder "stop"')
+      option.setName('verkauf').setDescription('Verkauf in Mio. oder "stop"')
     )
     .addStringOption(option =>
-      option
-        .setName('emoji')
-        .setDescription('Emoji des Spawners ändern')
+      option.setName('emoji').setDescription('Emoji des Spawners ändern')
     ),
 
   new SlashCommandBuilder()
@@ -134,7 +118,7 @@ const commands = [
       }
     ]
   },
-    {
+  {
     name: 'tpaccept',
     description: 'Accepts a Tpa from another Player',
     options: [
@@ -192,25 +176,17 @@ const commands = [
     name: 'clan-info',
     description: 'Shows all clan members and their roles'
   }
-].map(command => command.toJSON ? command.toJSON() : command);
+].map(command => (command.toJSON ? command.toJSON() : command));
 
-const rest = new REST({ version: '10' })
-  .setToken(process.env.DISCORD_BOT_TOKEN);
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
 
-(async () => {
-  try {
-    await rest.put(
-      Routes.applicationGuildCommands(
-        process.env.CLIENT_ID,
-        process.env.GUILD_ID
-      ),
-      {
-        body: commands
-      }
-    );
+try {
+  await rest.put(
+    Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+    { body: commands }
+  );
 
-    console.log('Alle Guild Slash Commands registriert.');
-  } catch (error) {
-    console.error(error);
-  }
-})();
+  console.log('Alle Guild Slash Commands registriert.');
+} catch (error) {
+  console.error(error);
+}
