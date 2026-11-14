@@ -639,8 +639,12 @@ async function createTicketThread(interaction, mode, spawnerName, ingameName, an
     };
 
     const ticketMessage = await thread.send({
+      content: traderRole ? `<@&${traderRole.id}>` : '',
       components: createTicketComponents(ticket),
-      flags: MessageFlags.IsComponentsV2
+      flags: MessageFlags.IsComponentsV2,
+      allowedMentions: {
+        roles: traderRole ? [traderRole.id] : []
+      }
     });
 
     ticket.messageId = ticketMessage.id;
