@@ -104,6 +104,9 @@ function setPanel(channelId, messageId) {
 
 
 function requireToken(req, res, next) {
+
+console.log('Recv:', JSON.stringify(auth), '| Expected:', JSON.stringify(`Bearer ${token}`));
+
   const token = process.env.API_TOKEN;
   const auth = req.headers.authorization || '';
 
