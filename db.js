@@ -422,7 +422,7 @@ async function startLogin() {
   const name = document.getElementById('name').value.trim();
   const status = document.getElementById('status');
 
-  const res = await fetch('/api/login', {
+  const res = await fetch('/trade/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ minecraftUsername: name })
@@ -438,7 +438,7 @@ async function startLogin() {
   status.innerHTML = 'Sende diesen Code im Spiel per <b>/msg JSK1905</b>:<br><span class="code">' + data.code + '</span>';
 
   const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const ws = new WebSocket(proto + location.host + '/ws?sessionId=' + encodeURIComponent(data.sessionId));
+  const ws = new WebSocket(proto + location.host + '/trade/ws?sessionId=' + encodeURIComponent(data.sessionId));
 
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
