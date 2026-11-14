@@ -25,7 +25,8 @@ import {
   priceText,
   saveJSON,
   resolveTraderRole,
-  isTraderMember
+  isTraderMember,
+  TICKETS_FILE
 } from './context.js';
 
 let discordClient = null;
