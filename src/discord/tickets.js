@@ -127,9 +127,9 @@ function buildTicketEmbed(ticket, mention = '') {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      mention +
       `## ${titleLine}\n` +
-      `**🤝 • Handel #${ticket.tradeNumber}**`
+      `**🤝 • Handel #${ticket.tradeNumber}**\n` +
+       mention
     )
   );
 
