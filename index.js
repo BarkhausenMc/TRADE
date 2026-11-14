@@ -3,6 +3,7 @@ const chalk = require('chalk');
 const fs = require('node:fs');
 const path = require('node:path');
 const minecraft = require('./minecraft.js');
+const db = require('./db.js');
 
 const {
   Client,
@@ -123,10 +124,8 @@ if (priceLogData.lastChangeAt) {
 });
 
 
-const SPAWNER_FILE = path.join(__dirname, 'spawners.json');
-const PANEL_FILE = path.join(__dirname, 'panel.json');
-const TICKETS_FILE = path.join(__dirname, 'tickets.json');
 
+const TICKETS_FILE = path.join(__dirname, 'tickets.json');
 const PRICE_LOG_FILE = path.join(__dirname, 'price-log.json');
 const PRICE_LOG_TIMEOUT = 5 * 60 * 1000;
 let priceLogData = loadJSON(PRICE_LOG_FILE, {
@@ -154,28 +153,8 @@ function saveJSON(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-let spawners = loadJSON(SPAWNER_FILE, []);
-let panelData = loadJSON(PANEL_FILE, {
-  channelId: null,
-  messageId: null
-});
-let ticketData = loadJSON(TICKETS_FILE, {
-  count: 0,
-  completed: 0,
-  tickets: {}
-});
-
-if (!ticketData.tickets) {
-  ticketData.tickets = {};
-}
-
-if (typeof ticketData.count !== 'number') {
-  ticketData.count = 0;
-}
-
-if (typeof ticketData.completed !== 'number') {
-  ticketData.completed = 0;
-}
+let spawners = db.getSpawners();
+let panelData = db.getPanel();
 
 function formatPrice(price) {
   const value = Number(price);
@@ -1373,7 +1352,7 @@ client.on(Events.InteractionCreate, async interaction => {
           messageId: message.id
         };
 
-        saveJSON(PANEL_FILE, panelData);
+        db.setPanel(message.channelId, message.id)
       }
 
       await interaction.editReply({
@@ -1427,7 +1406,7 @@ client.on(Events.InteractionCreate, async interaction => {
       added = true;
     }
 
-    saveJSON(SPAWNER_FILE, spawners);
+    db.saveSpawners(spawners)
 
     const updated = await updateSpawnerPanel();
 
@@ -1526,7 +1505,7 @@ client.on(Events.InteractionCreate, async interaction => {
       spawner.emoji = emojiInput.trim();
     }
 
-    saveJSON(SPAWNER_FILE, spawners);
+    db.saveSpawners(spawners)
 
     const updated = await updateSpawnerPanel();
 
@@ -1597,7 +1576,7 @@ if (changes.length > 0) {
 
     spawners.splice(index, 1);
 
-    saveJSON(SPAWNER_FILE, spawners);
+    db.saveSpawners(spawners)
 
     const updated = await updateSpawnerPanel();
 
@@ -1617,5 +1596,6 @@ if (changes.length > 0) {
   }
 });
 
+db.startApi();
 minecraft.attach(client);
 client.login(process.env.DISCORD_BOT_TOKEN);
