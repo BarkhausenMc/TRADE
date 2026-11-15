@@ -311,7 +311,7 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
     // Trader-Ping unter dem Container senden
     if (traderRole) {
       await thread.send({
-        content: `||**<@&${traderRole.id}> — Neuer Trade von ${ingameName}**!||`,
+        content: `||**<@&${traderRole.id}> — Neuer Trade von \`${ingameName}\`**!||`,
         allowedMentions: {
           roles: [traderRole.id]
         }
