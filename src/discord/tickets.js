@@ -302,24 +302,21 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       abgeschlossen: false
     };
 
-    // Trader-Rolle separat pingen
-    if (traderRole) {
-      await thread.send({
-        content: `<@&${traderRole.id}>`,
-        allowedMentions: {
-          roles: [traderRole.id]
-        }
-      });
-    }
-
     // Ticket-Nachricht als Components V2 senden
     const ticketMessage = await thread.send({
       components: createTicketComponents(ticket),
       flags: MessageFlags.IsComponentsV2
     });
 
-    ticket.messageId = ticketMessage.id;
-    ticketData.tickets[thread.id] = ticket;
+    // Trader-Ping unter dem Container senden
+    if (traderRole) {
+      await thread.send({
+        content: `||**<@&${traderRole.id}> — Neuer Trade von ${ingameName}**!||`,
+        allowedMentions: {
+          roles: [traderRole.id]
+        }
+      });
+    }
 
     saveTickets();
 
