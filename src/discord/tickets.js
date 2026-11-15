@@ -231,6 +231,7 @@ async function updateTicketMessage(channel, ticket) {
   }
 }
 
+
 export async function createTicketThread(interaction, mode, spawnerName, ingameName, anzahl) {
   const spawner = spawners.find(
     s => s.name.toLowerCase() === spawnerName.toLowerCase()
@@ -249,6 +250,7 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
 
   const actionLabel = mode === 'kaufen' ? '📥 Verkauf' : '📤 Ankauf';
   const relevantPrice = mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+
   const gesamtpreis =
     relevantPrice === null
       ? 'Stop'
@@ -304,13 +306,25 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       abgeschlossen: false
     };
 
-    // Ticket-Nachricht als Components V2 senden
+    // Ticket-Container senden
     const ticketMessage = await thread.send({
       components: createTicketComponents(ticket),
       flags: MessageFlags.IsComponentsV2
     });
 
-    // Trader-Ping unter dem Container senden
+    // WICHTIG: Message-ID und Ticket speichern
+    ticket.messageId = ticketMessage.id;
+    ticketData.tickets[thread.id] = ticket;
+
+    saveTickets();
+
+    console.log('[TICKET SAVED]', {
+      threadId: thread.id,
+      messageId: ticket.messageId,
+      savedTickets: Object.keys(ticketData.tickets)
+    });
+
+    // Trader-Ping unter dem Container
     if (traderRole) {
       await thread.send({
         content: `||**<@&${traderRole.id}> — Neuer Trade von \`${ingameName}\`**!||`,
@@ -319,8 +333,6 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
         }
       });
     }
-
-    saveTickets();
 
     await interaction.editReply({
       components: [
@@ -331,6 +343,7 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       ],
       flags: noticeFlags
     });
+
   } catch (error) {
     console.error('Ticket konnte nicht erstellt werden:', error);
 
@@ -341,30 +354,17 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
   }
 }
 
+
 function saveTickets() {
   saveJSON(TICKETS_FILE, ticketData);
 }
 
 async function getTicketFromChannel(interaction) {
-  const channelId = interaction.channel.id;
-  const ticket = ticketData.tickets[channelId];
-
-  console.log('[TICKET DEBUG]', {
-    channelId,
-    ticketFound: !!ticket,
-    messageId: ticket?.messageId,
-    availableTickets: Object.keys(ticketData.tickets)
-  });
+  const ticket = ticketData.tickets[interaction.channel.id];
 
   if (!ticket || !ticket.messageId) {
     await interaction.reply({
-      components: [
-        buildNotice(
-          `❌ Ticket nicht gefunden!\n` +
-          `Channel-ID: \`${channelId}\`\n` +
-          `Ticket vorhanden: \`${!!ticket}\``
-        )
-      ],
+      components: [buildNotice('❌ Dieses Ticket konnte nicht gefunden werden.')],
       flags: noticeFlags
     });
 
