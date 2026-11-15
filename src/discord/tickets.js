@@ -302,10 +302,11 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       abgeschlossen: false
     };
 
-    const mention = traderRole ? `<@&${traderRole.id}>` : '';
+    const mention = traderRole ? `<@&${traderRole.id}>` : '⚠️ Keine Trader-Rolle gefunden!';
 
     const ticketMessage = await thread.send({
-      components: createTicketComponents(ticket, mention),
+      content: mention,
+      components: createTicketComponents(ticket, ''),
       flags: MessageFlags.IsComponentsV2,
       allowedMentions: {
         roles: traderRole ? [traderRole.id] : []
