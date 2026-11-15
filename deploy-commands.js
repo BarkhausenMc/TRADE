@@ -1,6 +1,12 @@
 import 'dotenv/config';
 
-import { REST, Routes, SlashCommandBuilder } from 'discord.js';
+import {
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  PermissionFlagsBits
+} from 'discord.js';
+
 
 const commands = [
   new SlashCommandBuilder()
@@ -175,7 +181,20 @@ const commands = [
   {
     name: 'clan-info',
     description: 'Shows all clan members and their roles'
-  }
+  },
+
+    new SlashCommandBuilder()
+    .setName('trades-counter')
+    .setDescription('Stellt den abgeschlossenen Trade-Counter ein')
+    .addIntegerOption(option =>
+      option
+        .setName('anzahl')
+        .setDescription('Neue Anzahl abgeschlossener Trades')
+        .setRequired(true)
+        .setMinValue(0)
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
@@ -190,3 +209,4 @@ try {
 } catch (error) {
   console.error(error);
 }
+
