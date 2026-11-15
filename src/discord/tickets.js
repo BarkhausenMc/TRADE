@@ -271,6 +271,8 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       reason: `Ticket: ${actionLabel} ${spawner.name}-Spawner (von ${interaction.user.tag})`
     });
 
+    const traderRole = resolveTraderRole(interaction.guild);
+
     const membersToAdd = new Set([interaction.user.id]);
 
     if (traderRole) {
