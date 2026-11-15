@@ -29,6 +29,8 @@ import {
   TICKETS_FILE
 } from './context.js';
 
+import { updateSpawnerPanel } from './panel.js';
+
 let discordClient = null;
 
 export function bindTicketClient(client) {
@@ -476,10 +478,13 @@ export async function handleTicketSold(interaction) {
     });
   }
 
-  ticket.abgeschlossen = true;
-  ticketData.completed += 1;
+    ticket.abgeschlossen = true;
+    ticketData.completed += 1;
 
-  saveTickets();
+    saveTickets();
+
+    // Spawner-Panel aktualisieren
+    await updateSpawnerPanel();
 
   await updateTicketMessage(interaction.channel, ticket);
 

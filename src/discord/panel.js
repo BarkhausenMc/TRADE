@@ -17,8 +17,10 @@ import {
   ticketData,
   saveJSON,
   formatPrice,
-  priceText
+  priceText,
+  TICKETS_FILE
 } from './context.js';
+
 import { setPanelData } from './context.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -125,4 +127,18 @@ export async function updateSpawnerPanel() {
     console.error('Spawner-Panel konnte nicht aktualisiert werden:', error);
     return false;
   }
+}
+
+export async function setCompletedTrades(amount) {
+  if (!Number.isInteger(amount) || amount < 0) {
+    throw new Error('Ungültige Trade-Anzahl');
+  }
+
+  ticketData.completed = amount;
+
+  saveJSON(TICKETS_FILE, ticketData);
+
+  await updateSpawnerPanel();
+
+  return ticketData.completed;
 }

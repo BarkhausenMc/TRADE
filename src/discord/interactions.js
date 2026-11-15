@@ -31,6 +31,8 @@ import {
   handleTicketCancel
 } from './tickets.js';
 
+import { setCompletedTrades } from './panel.js';
+
 export function registerInteractions(client) {
   client.on('interactionCreate', async interaction => {
     if (interaction.isButton() && interaction.customId === 'spawner_price_role') {
@@ -179,7 +181,8 @@ export function registerInteractions(client) {
       'setup-spawner',
       'spawner-hinzufuegen',
       'setprice',
-      'spawner-remove'
+      'spawner-remove',
+      'trades-counter'
     ];
 
     if (tradeCommands.includes(interaction.commandName)) {
@@ -229,6 +232,26 @@ export function registerInteractions(client) {
     if (interaction.commandName === 'spawner-remove') {
       return handleSpawnerRemove(interaction);
     }
+
+    if (interaction.commandName === 'trades-counter') {
+  const amount = interaction.options.getInteger('anzahl', true);
+
+  try {
+    await setCompletedTrades(amount);
+
+    return interaction.reply({
+      content: `✅ Der Trade-Counter wurde auf **${amount}** gesetzt und das Panel aktualisiert.`,
+      ephemeral: true
+    });
+  } catch (error) {
+    console.error('Trade-Counter konnte nicht geändert werden:', error);
+
+    return interaction.reply({
+      content: '❌ Der Trade-Counter konnte nicht geändert werden.',
+      ephemeral: true
+    });
+  }
+}
   });
 }
 
@@ -520,4 +543,6 @@ async function handleSpawnerRemove(interaction) {
     ],
     flags: noticeFlags
   });
+
 }
+
