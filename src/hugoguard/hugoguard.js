@@ -1,4 +1,4 @@
-require('dotenv').config();
+import 'dotenv/config';
 
 const HUGOGUARD_BASE_URL = process.env.HUGOGUARD_BASE_URL || 'https://api.hugoguard.net';
 const HUGOGUARD_API_KEY = process.env.HUGOGUARD_PARTNER_API_KEY;
@@ -12,7 +12,7 @@ const headers = {
   'x-partner-api-key': HUGOGUARD_API_KEY
 };
 
-async function hugoguardRequest(method, endpoint, body) {
+export async function hugoguardRequest(method, endpoint, body) {
   console.log(`[HugoGuard] Request: ${method} ${endpoint}`);
   console.log(`[HugoGuard] Body: ${JSON.stringify(body)}`);
 
@@ -51,19 +51,38 @@ function toRaw(priceInMio) {
   return Math.round(Number(priceInMio) * 1000000);
 }
 
-async function pushSpawner(spawner) {
+export async function pushSpawner(spawner) {
   const item = toItem(spawner.name);
-  console.log(`[HugoGuard] pushSpawner: "${spawner.name}" -> item "${item}", buy=${toRaw(spawner.ankauf)}, sell=${toRaw(spawner.verkauf)}`);
-  return hugoguardRequest('PUT', `/partner/v1/spawners/${item}`, {
-    quantity: 0,
-    buyPrice: toRaw(spawner.ankauf),
-    sellPrice: toRaw(spawner.verkauf)
-  });
+  const buyPrice = spawner.ankauf === null || spawner.ankauf === undefined ? null : toRaw(spawner.ankauf);
+  const sellPrice = spawner.verkauf === null || spawner.verkauf === undefined ? null : toRaw(spawner.verkauf);
+
+  console.log(`[HugoGuard] pushSpawner: "${spawner.name}" -> item "${item}", buy=${buyPrice}, sell=${sellPrice}`);
+
+  if (buyPrice === null && sellPrice === null) {
+    console.warn('[HugoGuard] Weder Ankauf noch Verkauf gesetzt – Eintrag wird gelöscht.');
+    return removeSpawner(spawner.name);
+  }
+
+  try {
+    return await hugoguardRequest('PATCH', `/partner/v1/spawners/${item}`, {
+      buyPrice,
+      sellPrice
+    });
+  } catch (error) {
+    if (String(error.message).includes('404')) {
+      console.log('[HugoGuard] Eintrag existiert noch nicht – lege ihn per PUT an.');
+      return hugoguardRequest('PUT', `/partner/v1/spawners/${item}`, {
+        quantity: 0,
+        buyPrice,
+        sellPrice
+      });
+    }
+
+    throw error;
+  }
 }
 
-async function removeSpawner(name) {
+export async function removeSpawner(name) {
   console.log(`[HugoGuard] removeSpawner: "${name}"`);
   return hugoguardRequest('DELETE', `/partner/v1/spawners/${toItem(name)}`);
 }
-
-module.exports = { hugoguardRequest, pushSpawner, removeSpawner, toItem, toRaw };

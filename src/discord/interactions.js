@@ -32,6 +32,7 @@ import {
 } from './tickets.js';
 
 import { setCompletedTrades } from './panel.js';
+import { pushSpawner, removeSpawner } from '../hugoguard/hugoguard.js';
 
 export function registerInteractions(client) {
   client.on('interactionCreate', async interaction => {
@@ -471,6 +472,11 @@ async function handleSetPrice(interaction) {
 
   setSpawners(list);
   saveSpawners(list);
+    try {
+    await pushSpawner(spawner);
+  } catch (error) {
+    console.error('[HugoGuard] Push fehlgeschlagen:', error);
+  }
 
   const updated = await updateSpawnerPanel();
 
@@ -529,7 +535,12 @@ async function handleSpawnerRemove(interaction) {
 
   setSpawners(list);
   saveSpawners(list);
-
+    try {
+    await removeSpawner(removed.name);
+  } catch (error) {
+    console.error('[HugoGuard] Remove fehlgeschlagen:', error);
+  } 
+  
   const updated = await updateSpawnerPanel();
 
   await interaction.editReply({
