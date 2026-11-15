@@ -1,38 +1,50 @@
 import 'dotenv/config';
 
-const HUGOGUARD_BASE_URL = process.env.HUGOGUARD_BASE_URL || 'https://api.hugoguard.net';
-const HUGOGUARD_API_KEY = process.env.HUGOGUARD_PARTNER_API_KEY;
+const HUGOGUARD_BASE_URL = process.env.HUGOGUARD_BASE_URL || 'https://hugoguard.net/api';
 
-console.log('[HugoGuard] Modul geladen.');
-console.log(`[HugoGuard] Base-URL: ${HUGOGUARD_BASE_URL}`);
-console.log(`[HugoGuard] API-Key gesetzt: ${HUGOGUARD_API_KEY ? 'ja' : 'NEIN'}`);
-
-const headers = {
-  'Content-Type': 'application/json',
-  'x-partner-api-key': HUGOGUARD_API_KEY
+const NAME_MAP = {
+  'skellet': 'SKELETON',
+  'skeleton': 'SKELETON',
+  'zombie': 'ZOMBIE',
+  'creeper': 'CREEPER',
+  'spider': 'SPIDER',
+  'blaze': 'BLAZE',
+  'iron-golem': 'IRON_GOLEM',
+  'cow': 'COW',
+  'zombie-piglin': 'ZOMBIE_PIGLIN'
 };
 
-export async function hugoguardRequest(method, endpoint, body) {
-  console.log(`[HugoGuard] Request: ${method} ${endpoint}`);
-  console.log(`[HugoGuard] Body: ${JSON.stringify(body)}`);
+function toItem(name) {
+  const key = String(name).trim().toLowerCase();
+  return NAME_MAP[key] || key.toUpperCase();
+}
 
-  if (!HUGOGUARD_API_KEY) {
-    console.error('[HugoGuard] Abbruch: kein API-Key in .env');
+function toRaw(priceInMio) {
+  return Math.round(Number(priceInMio) * 1000000);
+}
+
+async function hugoguardRequest(method, endpoint, body) {
+  const apiKey = process.env.HUGOGUARD_PARTNER_API_KEY;
+
+  if (!apiKey) {
     throw new Error('HUGOGUARD_PARTNER_API_KEY ist nicht gesetzt.');
   }
 
   const response = await fetch(`${HUGOGUARD_BASE_URL}${endpoint}`, {
     method,
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-partner-api-key': apiKey
+    },
     body: body ? JSON.stringify(body) : undefined
   });
 
-  console.log(`[HugoGuard] Status: ${response.status} ${response.statusText}`);
+  console.log(`[HugoGuard] ${method} ${endpoint} -> ${response.status}`);
 
   const text = await response.text();
-  console.log(`[HugoGuard] Antwort: ${text || '(leer)'}`);
 
   if (!response.ok) {
+    console.error(`[HugoGuard] Antwort: ${text}`);
     throw new Error(`HugoGuard API ${method} ${endpoint} -> ${response.status}: ${text}`);
   }
 
@@ -43,41 +55,24 @@ export async function hugoguardRequest(method, endpoint, body) {
   }
 }
 
-function toItem(name) {
-  return name.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
-}
-
-function toRaw(priceInMio) {
-  return Math.round(Number(priceInMio) * 1000000);
-}
-
 export async function pushSpawner(spawner) {
   const item = toItem(spawner.name);
-  const buyPrice = spawner.ankauf === null || spawner.ankauf === undefined ? null : toRaw(spawner.ankauf);
-  const sellPrice = spawner.verkauf === null || spawner.verkauf === undefined ? null : toRaw(spawner.verkauf);
+  const buyPrice = spawner.ankauf == null ? null : toRaw(spawner.ankauf);
+  const sellPrice = spawner.verkauf == null ? null : toRaw(spawner.verkauf);
 
-  console.log(`[HugoGuard] pushSpawner: "${spawner.name}" -> item "${item}", buy=${buyPrice}, sell=${sellPrice}`);
+  console.log(`[HugoGuard] pushSpawner: "${spawner.name}" -> "${item}", buy=${buyPrice}, sell=${sellPrice}`);
 
   if (buyPrice === null && sellPrice === null) {
-    console.warn('[HugoGuard] Weder Ankauf noch Verkauf gesetzt – Eintrag wird gelöscht.');
     return removeSpawner(spawner.name);
   }
 
   try {
-    return await hugoguardRequest('PATCH', `/partner/v1/spawners/${item}`, {
-      buyPrice,
-      sellPrice
-    });
+    return await hugoguardRequest('PATCH', `/partner/v1/spawners/${item}`, { buyPrice, sellPrice });
   } catch (error) {
     if (String(error.message).includes('404')) {
       console.log('[HugoGuard] Eintrag existiert noch nicht – lege ihn per PUT an.');
-      return hugoguardRequest('PUT', `/partner/v1/spawners/${item}`, {
-        quantity: 0,
-        buyPrice,
-        sellPrice
-      });
+      return hugoguardRequest('PUT', `/partner/v1/spawners/${item}`, { quantity: 0, buyPrice, sellPrice });
     }
-
     throw error;
   }
 }
