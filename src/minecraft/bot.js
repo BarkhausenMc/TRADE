@@ -186,7 +186,48 @@ async function handleInteraction(interaction) {
     return;
   }
 
-  if (!interaction.isChatInputCommand()) return;
+async function hasTradeLeaderRole(interaction) {
+  if (!interaction.guild) return false;
+
+  const roleId = process.env.TRADE_LEADER_ROLE_ID;
+
+  if (roleId) {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+
+    return member.roles.cache.has(roleId);
+  }
+
+  const member = await interaction.guild.members.fetch(interaction.user.id);
+
+  return member.roles.cache.some(
+    role => role.name.toLowerCase() === 'trade leader'
+  );
+}
+
+if (!interaction.isChatInputCommand()) return;
+
+// TRADE LEADER Berechtigungsprüfung
+try {
+  const allowed = await hasTradeLeaderRole(interaction);
+
+  if (!allowed) {
+    await interaction.reply({
+      content: '❌ Du benötigst die **TRADE leader** Rolle, um diesen Befehl auszuführen.',
+      flags: MessageFlags.Ephemeral
+    });
+
+    return;
+  }
+} catch (error) {
+  console.error('[TRADE LEADER CHECK ERROR]', error);
+
+  await interaction.reply({
+    content: '❌ Deine Berechtigung konnte nicht überprüft werden.',
+    flags: MessageFlags.Ephemeral
+  });
+
+  return;
+}
 
   if (interaction.commandName === 'msg') {
     if (!AUTHORIZED_USER_IDS.includes(interaction.user.id)) {
