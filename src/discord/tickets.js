@@ -302,15 +302,20 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       abgeschlossen: false
     };
 
-    const mention = traderRole ? `<@&${traderRole.id}>` : '⚠️ Keine Trader-Rolle gefunden!';
+    // Trader-Rolle separat pingen
+    if (traderRole) {
+      await thread.send({
+        content: `<@&${traderRole.id}>`,
+        allowedMentions: {
+          roles: [traderRole.id]
+        }
+      });
+    }
 
+    // Ticket-Nachricht als Components V2 senden
     const ticketMessage = await thread.send({
-      content: mention,
-      components: createTicketComponents(ticket, ''),
-      flags: MessageFlags.IsComponentsV2,
-      allowedMentions: {
-        roles: traderRole ? [traderRole.id] : []
-      }
+      components: createTicketComponents(ticket),
+      flags: MessageFlags.IsComponentsV2
     });
 
     ticket.messageId = ticketMessage.id;
