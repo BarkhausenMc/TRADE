@@ -346,11 +346,25 @@ function saveTickets() {
 }
 
 async function getTicketFromChannel(interaction) {
-  const ticket = ticketData.tickets[interaction.channel.id];
+  const channelId = interaction.channel.id;
+  const ticket = ticketData.tickets[channelId];
+
+  console.log('[TICKET DEBUG]', {
+    channelId,
+    ticketFound: !!ticket,
+    messageId: ticket?.messageId,
+    availableTickets: Object.keys(ticketData.tickets)
+  });
 
   if (!ticket || !ticket.messageId) {
     await interaction.reply({
-      components: [buildNotice('❌ Dieses Ticket konnte nicht gefunden werden.')],
+      components: [
+        buildNotice(
+          `❌ Ticket nicht gefunden!\n` +
+          `Channel-ID: \`${channelId}\`\n` +
+          `Ticket vorhanden: \`${!!ticket}\``
+        )
+      ],
       flags: noticeFlags
     });
 
