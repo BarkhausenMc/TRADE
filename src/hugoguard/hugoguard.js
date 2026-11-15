@@ -27,31 +27,25 @@ async function hugoguardRequest(method, endpoint, body) {
   return response.json().catch(() => null);
 }
 
+function toItem(name) {
+  return name.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+}
+
+function toRaw(priceInMio) {
+  return Math.round(Number(priceInMio) * 1000000);
+}
+
 async function pushSpawner(spawner) {
-  const item = spawner.name.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+  const item = toItem(spawner.name);
   return hugoguardRequest('PUT', `/partner/v1/spawners/${item}`, {
-    name: spawner.name,
-    ankauf: spawner.ankauf,
-    verkauf: spawner.verkauf
+    quantity: 0,
+    buyPrice: toRaw(spawner.ankauf),
+    sellPrice: toRaw(spawner.verkauf)
   });
 }
 
 async function removeSpawner(name) {
-  const item = name.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
-  return hugoguardRequest('DELETE', `/partner/v1/spawners/${item}`);
+  return hugoguardRequest('DELETE', `/partner/v1/spawners/${toItem(name)}`);
 }
 
-async function syncAllSpawners(spawners) {
-  const results = [];
-  for (const spawner of spawners) {
-    try {
-      await pushSpawner(spawner);
-      results.push({ name: spawner.name, ok: true });
-    } catch (error) {
-      results.push({ name: spawner.name, ok: false, error: error.message });
-    }
-  }
-  return results;
-}
-
-module.exports = { hugoguardRequest, pushSpawner, removeSpawner, syncAllSpawners };
+module.exports = { hugoguardRequest, pushSpawner, removeSpawner, toItem, toRaw };
