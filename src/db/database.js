@@ -20,6 +20,14 @@ const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS ticket_bans (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    banned_by TEXT NOT NULL,
+   created_at INTEGER NOT NULL,
+  PRIMARY KEY (guild_id, user_id)
+  );
   CREATE TABLE IF NOT EXISTS login_sessions (
     session_id TEXT PRIMARY KEY,
     minecraft_username TEXT NOT NULL,
@@ -245,6 +253,41 @@ function verifyJwt(token) {
   }
 }
 
+function addTicketBan(guildId, userId, reason, bannedBy) {
+  db.prepare(`
+    INSERT INTO ticket_bans (
+      guild_id,
+      user_id,
+      reason,
+      banned_by,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(guild_id, user_id)
+    DO UPDATE SET
+      reason = excluded.reason,
+      banned_by = excluded.banned_by,
+      created_at = excluded.created_at
+  `).run(guildId, userId, reason, bannedBy, Date.now());
+}
+
+function getTicketBan(guildId, userId) {
+  return db.prepare(`
+    SELECT *
+    FROM ticket_bans
+    WHERE guild_id = ? AND user_id = ?
+  `).get(guildId, userId) ?? null;
+}
+
+function getTicketBans(guildId) {
+  return db.prepare(`
+    SELECT *
+    FROM ticket_bans
+    WHERE guild_id = ?
+    ORDER BY created_at DESC
+  `).all(guildId);
+}
+
 export {
   db,
   encryptJwt,
@@ -257,5 +300,8 @@ export {
   createVerifyCode,
   consumeVerifyCode,
   issueJwt,
-  verifyJwt
+  verifyJwt,
+  addTicketBan,
+  getTicketBan,
+  getTicketBans
 };

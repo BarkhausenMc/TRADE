@@ -1,7 +1,8 @@
 import {
   ContainerBuilder,
   TextDisplayBuilder,
-  MessageFlags
+  MessageFlags,
+  PermissionFlagsBits
 } from 'discord.js';
 
 import { createVerifyCode } from '../db/database.js';
@@ -33,6 +34,21 @@ import {
 
 import { setCompletedTrades } from './panel.js';
 import { pushSpawner, removeSpawner } from '../hugoguard/hugoguard.js';
+
+import {
+  addTicketBan,
+  getTicketBan,
+  getTicketBans
+} from '../db/database.js';
+
+function canManageTicketBans(interaction) {
+  return (
+    interaction.memberPermissions?.has(
+      PermissionFlagsBits.Administrator
+    ) ||
+    hasTradeLeaderRole(interaction)
+  );
+}
 
 export function registerInteractions(client) {
   client.on('interactionCreate', async interaction => {
@@ -91,6 +107,23 @@ export function registerInteractions(client) {
         interaction.customId !== 'ticket_verkaufen'
       ) {
         return;
+      }
+
+      const existingBan = getTicketBan(
+        interaction.guild.id,
+        interaction.user.id
+      );
+
+      if (existingBan) {
+        return interaction.reply({
+          components: [
+            buildNotice(
+              '🚫 Du darfst keine Tickets mehr erstellen.\n' +
+              `**Grund:** $DIL2`
+            )
+          ],
+          flags: noticeFlags
+        });
       }
 
       const mode =
@@ -177,6 +210,161 @@ export function registerInteractions(client) {
     }
 
     if (!interaction.isChatInputCommand()) return;
+
+    
+    // =====================================
+    // TICKET BAN SYSTEM
+    // =====================================
+
+    if (
+      interaction.commandName === 'ticket-ban' ||
+      interaction.commandName === 'ticket-ban-list'
+    ) {
+      // Berechtigungsprüfung
+      const canManageBans =
+        interaction.memberPermissions?.has(
+          PermissionFlagsBits.Administrator
+        ) || hasTradeLeaderRole(interaction);
+
+      if (!canManageBans) {
+        return interaction.reply({
+          components: [
+            buildNotice(
+              '❌ Du benötigst die **TRADE leader** Rolle oder Administratorrechte.'
+            )
+          ],
+          flags: noticeFlags
+        });
+      }
+
+      // =====================================
+      // /ticket-ban
+      // =====================================
+
+      if (interaction.commandName === 'ticket-ban') {
+        const user = interaction.options.getUser('user', true);
+        const reason = interaction.options.getString('grund', true).trim();
+
+        if (user.bot) {
+          return interaction.reply({
+            components: [
+              buildNotice('❌ Bots können nicht für Tickets gesperrt werden.')
+            ],
+            flags: noticeFlags
+          });
+        }
+
+        if (!reason) {
+          return interaction.reply({
+            components: [
+              buildNotice('❌ Bitte gib einen gültigen Ban-Grund an.')
+            ],
+            flags: noticeFlags
+          });
+        }
+
+        const existingBan = getTicketBan(
+          interaction.guild.id,
+          user.id
+        );
+
+        addTicketBan(
+          interaction.guild.id,
+          user.id,
+          reason,
+          interaction.user.id
+        );
+
+        return interaction.reply({
+          components: [
+            buildNotice(
+              `${existingBan
+                ? '♻️ **Ticket-Ban aktualisiert!**'
+                : '🚫 **Ticket-Ban ausgesprochen!**'
+              }\n\n` +
+              `👤 **Nutzer:** ${user}\n` +
+              `🆔 **ID:** \`${user.id}\`\n` +
+              `📝 **Grund:** ${reason}\n` +
+              `🛡️ **Moderator:** ${interaction.user}`
+            )
+          ],
+          flags: noticeFlags
+        });
+      }
+
+      // =====================================
+      // /ticket-ban-list
+      // =====================================
+
+      if (interaction.commandName === 'ticket-ban-list') {
+        const bans = getTicketBans(interaction.guild.id);
+
+        if (bans.length === 0) {
+          return interaction.reply({
+            components: [
+              buildNotice(
+                '✅ Es befinden sich aktuell keine Nutzer auf der Ticket-Ban-Liste.'
+              )
+            ],
+            flags: noticeFlags
+          });
+        }
+
+        const entries = bans.map((ban, index) => {
+          const date = new Date(ban.created_at).toLocaleString('de-DE');
+
+          return (
+            `### ${index + 1}. <@${ban.user_id}>\n` +
+            `🆔 **ID:** \`${ban.user_id}\`\n` +
+            `📝 **Grund:** ${ban.reason}\n` +
+            `🛡️ **Moderator:** <@${ban.banned_by}>\n` +
+            `📅 **Datum:** ${date}`
+          );
+        });
+
+        // Seiten erstellen
+        const pages = [];
+        let currentPage = '## 🚫 Ticket-Ban-Liste\n\n';
+
+        for (const entry of entries) {
+          if (currentPage.length + entry.length + 2 > 3500) {
+            pages.push(currentPage);
+            currentPage = '## 🚫 Ticket-Ban-Liste (Fortsetzung)\n\n';
+          }
+
+          currentPage += entry + '\n\n';
+        }
+
+        if (currentPage.trim()) {
+          pages.push(currentPage);
+        }
+
+        // Erste Seite senden
+        await interaction.reply({
+          components: [
+            new ContainerBuilder().addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(pages[0])
+            )
+          ],
+          flags: noticeFlags
+        });
+
+        // Weitere Seiten senden
+        for (let i = 1; i < pages.length; i++) {
+          await interaction.followUp({
+            components: [
+              new ContainerBuilder().addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(pages[i])
+              )
+            ],
+            flags: noticeFlags
+          });
+        }
+
+        return;
+      }
+    }
+
 
     const tradeCommands = [
       'setup-spawner',

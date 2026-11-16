@@ -195,6 +195,28 @@ const commands = [
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
+      // Ticket-Ban
+  new SlashCommandBuilder()
+    .setName('ticket-ban')
+    .setDescription('Sperrt einen Nutzer für die Erstellung neuer Tickets')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('Der Nutzer, der gesperrt werden soll')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option
+        .setName('grund')
+        .setDescription('Grund für den Ticket-Ban')
+        .setRequired(true)
+        .setMaxLength(500)
+    ),
+
+  // Ticket-Ban-Liste
+  new SlashCommandBuilder()
+    .setName('ticket-ban-list')
+    .setDescription('Zeigt alle Nutzer mit einem Ticket-Ban an'),
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);

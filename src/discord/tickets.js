@@ -30,6 +30,7 @@ import {
 } from './context.js';
 
 import { updateSpawnerPanel } from './panel.js';
+import { getTicketBan } from '../db/database.js';
 
 let discordClient = null;
 
@@ -233,6 +234,24 @@ async function updateTicketMessage(channel, ticket) {
 
 
 export async function createTicketThread(interaction, mode, spawnerName, ingameName, anzahl) {
+
+    const ticketBan = getTicketBan(
+    interaction.guild.id,
+    interaction.user.id
+  );
+
+  if (ticketBan) {
+    return interaction.editReply({
+      components: [
+        buildNotice(
+          '🚫 Du bist vom Erstellen neuer Tickets ausgeschlossen.\n' +
+          `**Grund:** $DIL1`
+        )
+      ],
+      flags: noticeFlags
+    });
+  }
+
   const spawner = spawners.find(
     s => s.name.toLowerCase() === spawnerName.toLowerCase()
   );
