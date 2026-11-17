@@ -11,7 +11,7 @@ const NAME_MAP = {
   'blaze': 'BLAZE',
   'iron-golem': 'IRON_GOLEM',
   'cow': 'COW',
-  'zombie-piglin': 'ZOMBIE_PIGLIN'
+  'piglin': 'ZOMBIE_PIGLIN'
 };
 
 function toItem(name) {
