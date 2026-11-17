@@ -72,7 +72,10 @@ export async function sendLog(title, body) {
   try {
     await channel.send({
       components: [buildLogContainer(title, body)],
-      flags: MessageFlags.IsComponentsV2
+      flags: MessageFlags.IsComponentsV2,
+      allowedMentions: {
+        parse: []
+      }
     });
   } catch (error) {
     console.error('[LOG ERROR]', error);
