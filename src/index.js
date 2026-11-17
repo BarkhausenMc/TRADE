@@ -14,8 +14,6 @@ import { bindTicketClient } from './discord/tickets.js';
 import {
   bindLogger,
   logBotStart,
-  logGuildMemberJoin,
-  logGuildMemberLeave
 } from './discord/logger.js';
 
 import { createClient } from './discord/client.js';
@@ -97,14 +95,6 @@ bindPanelClient(client);
 bindPriceLogClient(client);
 bindTicketClient(client);
 bindLogger(client);
-
-client.on('guildMemberAdd', member => {
-  logGuildMemberJoin(member).catch(() => {});
-});
-
-client.on('guildMemberRemove', member => {
-  logGuildMemberLeave(member).catch(() => {});
-});
 
 client.on('shardDisconnect', event => {
   console.warn('[DISCORD] Verbindung getrennt:', event?.code);
