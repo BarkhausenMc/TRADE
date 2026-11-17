@@ -112,6 +112,26 @@ function buildSimpleContainer(content) {
 }
 
 async function handleInteraction(interaction) {
+
+    // Nur Minecraft-bezogene Interactions verarbeiten
+  if (interaction.isChatInputCommand()) {
+    const minecraftCommands = [
+      'msg',
+      'chat',
+      'clan-chat',
+      'clan-kick',
+      'clan-invite',
+      'tpaccept',
+      'pay',
+      'pay-request',
+      'clan-info'
+    ];
+
+    if (!minecraftCommands.includes(interaction.commandName)) {
+      return;
+    }
+  }
+
   if (interaction.isButton()) {
     const [action, requestId] = interaction.customId.split('_');
 
