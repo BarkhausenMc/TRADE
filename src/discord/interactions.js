@@ -43,6 +43,9 @@ import {
   getTicketBans
 } from '../db/database.js';
 
+import { handleTradeCommand } from './trades.js';
+import { setupTradePanel } from './trade-panel.js';
+
 function canManageTicketBans(interaction) {
   return (
     interaction.memberPermissions?.has(
@@ -232,6 +235,24 @@ async function handleInteraction(interaction) {
 
     if (!interaction.isChatInputCommand()) return;
 
+    // =====================================
+    // TRADER STATISTICS
+    // =====================================
+
+    if (interaction.commandName === 'trade') {
+      return handleTradeCommand(interaction);
+    }
+
+    if (interaction.commandName === 'setup-trade-panel') {
+      if (!hasTradeLeaderRole(interaction)) {
+        return interaction.reply({
+          content: '❌ Du benötigst die TRADE leader Rolle.',
+          ephemeral: true
+        });
+      }
+
+      return setupTradePanel(interaction);
+    }
 
     // =====================================
     // TICKET BAN SYSTEM

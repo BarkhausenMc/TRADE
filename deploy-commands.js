@@ -217,6 +217,132 @@ const commands = [
   new SlashCommandBuilder()
     .setName('ticket-ban-list')
     .setDescription('Zeigt alle Nutzer mit einem Ticket-Ban an'),
+
+
+  new SlashCommandBuilder()
+    .setName('trade')
+    .setDescription('Trader-Statistiken und Trade-Verwaltung')
+
+    .addSubcommand(sub =>
+      sub
+        .setName('eintragen')
+        .setDescription('Trage einen eigenen Trade ein')
+        .addStringOption(option =>
+          option
+            .setName('quelle')
+            .setDescription('Wo wurde der Trade durchgeführt?')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Ingame-Chat', value: 'Ingame-Chat' },
+              { name: 'HugoSMP-Market', value: 'HugoSMP-Market' },
+              { name: 'Sonstige / manuell', value: 'Sonstige / manuell' }
+            )
+        )
+    )
+
+    .addSubcommand(sub =>
+      sub
+        .setName('stats')
+        .setDescription('Zeigt die Statistiken eines Traders')
+        .addUserOption(option =>
+          option
+            .setName('trader')
+            .setDescription('Trader (optional)')
+            .setRequired(false)
+        )
+    )
+
+    .addSubcommand(sub =>
+      sub
+        .setName('leaderboard')
+        .setDescription('Zeigt die Trader-Rangliste')
+        .addStringOption(option =>
+          option
+            .setName('zeitraum')
+            .setDescription('Zeitraum')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Diese Woche', value: 'weekly' },
+              { name: 'Dieser Monat', value: 'monthly' },
+              { name: 'All Time', value: 'all' }
+            )
+        )
+    )
+
+    .addSubcommand(sub =>
+      sub
+        .setName('historie')
+        .setDescription('Zeigt die letzten Trades')
+        .addUserOption(option =>
+          option
+            .setName('trader')
+            .setDescription('Trader (optional)')
+            .setRequired(false)
+        )
+    )
+
+    .addSubcommand(sub =>
+      sub
+        .setName('korrigieren')
+        .setDescription('Korrigiert einen Trade (TRADE Leader)')
+        .addIntegerOption(option =>
+          option
+            .setName('trade_id')
+            .setDescription('ID des Trades')
+            .setRequired(true)
+            .setMinValue(1)
+        )
+        .addUserOption(option =>
+          option
+            .setName('trader')
+            .setDescription('Neuer Trader')
+            .setRequired(true)
+        )
+        .addStringOption(option =>
+          option
+            .setName('quelle')
+            .setDescription('Neue Quelle')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Ingame-Chat', value: 'Ingame-Chat' },
+              { name: 'HugoSMP-Market', value: 'HugoSMP-Market' },
+              { name: 'Sonstige / manuell', value: 'Sonstige / manuell' },
+              { name: 'Ticket', value: 'ticket' }
+            )
+        )
+        .addStringOption(option =>
+          option
+            .setName('grund')
+            .setDescription('Grund der Korrektur')
+            .setRequired(true)
+            .setMaxLength(500)
+        )
+    )
+
+    .addSubcommand(sub =>
+      sub
+        .setName('löschen')
+        .setDescription('Löscht einen Trade aus der Statistik')
+        .addIntegerOption(option =>
+          option
+            .setName('trade_id')
+            .setDescription('ID des Trades')
+            .setRequired(true)
+            .setMinValue(1)
+        )
+        .addStringOption(option =>
+          option
+            .setName('grund')
+            .setDescription('Grund der Löschung')
+            .setRequired(true)
+            .setMaxLength(500)
+        )
+    ),
+
+  new SlashCommandBuilder()
+    .setName('setup-trade-panel')
+    .setDescription('Erstellt oder aktualisiert das Trade-Statistik-Panel'),
+
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);

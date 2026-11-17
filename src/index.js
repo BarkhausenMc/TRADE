@@ -17,6 +17,7 @@ import {
 } from './discord/logger.js';
 
 import { createClient } from './discord/client.js';
+import { bindTradePanelClient } from './discord/trade-panel.js';
 
 const client = createClient();
 
@@ -122,5 +123,11 @@ process.on('uncaughtException', error => {
 
 client.on('error', error => console.error('[CLIENT ERROR]', error));
 client.on('shardError', error => console.error('[SHARD ERROR]', error));
+
+bindPanelClient(client);
+bindPriceLogClient(client);
+bindTicketClient(client);
+bindTradePanelClient(client);
+bindLogger(client);
 
 client.login(process.env.DISCORD_BOT_TOKEN);
