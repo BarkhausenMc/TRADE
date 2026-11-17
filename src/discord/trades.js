@@ -18,7 +18,7 @@ import {
 
 import { hasTradeLeaderRole } from './context.js';
 import { updateTradePanel } from './trade-panel.js';
-
+import { MessageFlags } from 'discord.js';
 const SOURCES = [
   'Ingame-Chat',
   'HugoSMP-Market',
