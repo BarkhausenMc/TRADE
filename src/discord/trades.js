@@ -140,6 +140,7 @@ async function handleTradeInsert(interaction) {
   });
 }
 
+
 async function handleTradeStats(interaction) {
   const user = interaction.options.getUser('trader') || interaction.user;
 
@@ -148,7 +149,7 @@ async function handleTradeStats(interaction) {
     user.id
   );
 
-  return interaction.reply({
+  return interaction.editReply({
     components: [
       buildNotice(
         `# 📊 TRADE STATISTIK\n` +
@@ -158,9 +159,10 @@ async function handleTradeStats(interaction) {
         `🏆 **All Time:** ${stats.allTime}`
       )
     ],
-    flags: noticeFlags
+    flags: MessageFlags.IsComponentsV2
   });
 }
+
 
 async function handleLeaderboard(interaction) {
   const period = interaction.options.getString('zeitraum', true);
