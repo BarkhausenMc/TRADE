@@ -149,13 +149,6 @@ export function hasTradeLeaderRole(interaction) {
   return false;
 }
 
-export function isTraderMember(interaction, traderRole) {
-  return traderRole
-    ? memberHasRole(interaction, traderRole.id)
-    : false;
-}
-
-
 export function resolveTraderRole(guild) {
   if (process.env.TRADER_ROLE_ID) {
     const roleById = guild.roles.cache.get(process.env.TRADER_ROLE_ID);
