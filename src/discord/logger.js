@@ -271,14 +271,6 @@ export async function logBotReconnect() {
   );
 }
 
-export async function logGuildMemberJoin(member) {
-  await sendLog(
-    '👋 SERVER BEITRITT',
-    `<@${member.id}> (**${member.user.tag}**) ist dem Server beigetreten.\n` +
-    `-# Mitglieder: ${member.guild.memberCount}`
-  );
-}
-
 export async function logGuildMemberLeave(member) {
   await sendLog(
     '👋 SERVER VERLASSEN',

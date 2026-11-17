@@ -12,7 +12,7 @@ import {
   PRICE_LOG_TIMEOUT
 } from './context.js';
 
-import { logPriceChange } from './logger.js';
+import { archivePriceChange, logPriceChange } from './logger.js';
 
 const PRICE_LOG_FILE_URL = new URL('../../data/price-log.json', import.meta.url);
 
@@ -134,12 +134,23 @@ export async function updatePriceLog(interaction, spawner, changes) {
 
     armPriceLogDeletion();
 
-    logPriceChange(
-      spawner.name,
-      spawner.emoji,
-      changes.join('\n'),
-      interaction.user.id
-    ).catch(() => {});
+    const logChannelId = process.env.LOG_CHANNEL_ID;
+
+    if (logChannelId && logChannelId !== channelId) {
+      logPriceChange(
+        spawner.name,
+        spawner.emoji,
+        changes.join('\n'),
+        interaction.user.id
+      ).catch(() => {});
+    } else {
+      archivePriceChange(
+        spawner.name,
+        spawner.emoji,
+        changes.join('\n'),
+        interaction.user.id
+      );
+    }
 
     if (roleId) {
       try {

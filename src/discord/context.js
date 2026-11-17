@@ -16,7 +16,7 @@ const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 export const TICKETS_FILE = path.join(DATA_DIR, 'tickets.json');
 export const PRICE_LOG_FILE = path.join(DATA_DIR, 'price-log.json');
 
-export const PRICE_LOG_TIMEOUT = 5 * 60 * 1000;
+export const PRICE_LOG_TIMEOUT = 60 * 60 * 1000;
 
 function loadJSON(file, fallback) {
   try {
