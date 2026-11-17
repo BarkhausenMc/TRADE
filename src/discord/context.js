@@ -107,13 +107,54 @@ export function parsePrice(input) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-export function hasTradeLeaderRole(interaction) {
-  return interaction.member?.roles?.cache?.some(
-    role =>
-      role.name === 'TRADE leader' ||
-      role.id === process.env.TRADE_LEADER_ROLE_ID
-  ) ?? false;
+
+function memberHasRole(interaction, roleId) {
+  const roles = interaction.member?.roles;
+
+  if (!roles || !roleId) return false;
+
+  // Normales Discord.js GuildMember
+  if (roles.cache) {
+    return roles.cache.has(roleId);
+  }
+
+  // APIInteractionGuildMember
+  if (Array.isArray(roles)) {
+    return roles.includes(roleId);
+  }
+
+  return false;
 }
+
+export function hasTradeLeaderRole(interaction) {
+  const roles = interaction.member?.roles;
+
+  if (!roles) return false;
+
+  if (roles.cache) {
+    return roles.cache.some(
+      role =>
+        role.name === 'TRADE leader' ||
+        role.id === process.env.TRADE_LEADER_ROLE_ID
+    );
+  }
+
+  if (Array.isArray(roles)) {
+    return Boolean(
+      process.env.TRADE_LEADER_ROLE_ID &&
+      roles.includes(process.env.TRADE_LEADER_ROLE_ID)
+    );
+  }
+
+  return false;
+}
+
+export function isTraderMember(interaction, traderRole) {
+  return traderRole
+    ? memberHasRole(interaction, traderRole.id)
+    : false;
+}
+
 
 export function resolveTraderRole(guild) {
   if (process.env.TRADER_ROLE_ID) {

@@ -26,12 +26,7 @@ const SOURCES = [
 ];
 
 function isTradeLeader(interaction) {
-  const roleId = process.env.TRADE_LEADER_ROLE_ID;
-
-  return Boolean(
-    roleId &&
-    interaction.member?.roles?.cache?.has(roleId)
-  );
+  return hasTradeLeaderRole(interaction);
 }
 
 function formatDate(timestamp) {
@@ -51,35 +46,46 @@ function validSource(source) {
   return SOURCES.includes(source);
 }
 
+
 export async function handleTradeCommand(interaction) {
-  const subcommand = interaction.options.getSubcommand();
+  await interaction.deferReply({ ephemeral: true });
 
-  const traderRole = resolveTraderRole(interaction.guild);
+  try {
+    const subcommand = interaction.options.getSubcommand();
 
-  const isTrader = isTraderMember(interaction, traderRole);
-  const isLeader = hasTradeLeaderRole(interaction);
+    const traderRole = resolveTraderRole(interaction.guild);
 
-  if (!isTrader && !isLeader) {
-    return interaction.reply({
-      content: '❌ Du benötigst die Trader-Rolle oder TRADE Leader-Rolle.',
-      ephemeral: true
-    });
+    const isTrader = isTraderMember(interaction, traderRole);
+    const isLeader = hasTradeLeaderRole(interaction);
+
+    if (!isTrader && !isLeader) {
+      return interaction.editReply({
+        content: '❌ Du benötigst die Trader-Rolle oder TRADE Leader-Rolle.'
+      });
+    }
+
+    if (['korrigieren', 'löschen'].includes(subcommand) && !isLeader) {
+      return interaction.editReply({
+        content: '❌ Nur TRADE Leader dürfen diese Aktion durchführen.'
+      });
+    }
+
+    if (subcommand === 'eintragen') return handleTradeInsert(interaction);
+    if (subcommand === 'stats') return handleTradeStats(interaction);
+    if (subcommand === 'leaderboard') return handleLeaderboard(interaction);
+    if (subcommand === 'historie') return handleHistory(interaction);
+    if (subcommand === 'korrigieren') return handleCorrection(interaction);
+    if (subcommand === 'löschen') return handleDeletion(interaction);
+
+  } catch (error) {
+    console.error('Trade Command Error:', error);
+
+    return interaction.editReply({
+      content: '❌ Beim Ausführen des Trade-Befehls ist ein Fehler aufgetreten.'
+    }).catch(console.error);
   }
-
-  if (['korrigieren', 'löschen'].includes(subcommand) && !isLeader) {
-    return interaction.reply({
-      content: '❌ Nur TRADE Leader dürfen diese Aktion durchführen.',
-      ephemeral: true
-    });
-  }
-
-  if (subcommand === 'eintragen') return handleTradeInsert(interaction);
-  if (subcommand === 'stats') return handleTradeStats(interaction);
-  if (subcommand === 'leaderboard') return handleLeaderboard(interaction);
-  if (subcommand === 'historie') return handleHistory(interaction);
-  if (subcommand === 'korrigieren') return handleCorrection(interaction);
-  if (subcommand === 'löschen') return handleDeletion(interaction);
 }
+
 
 async function handleTradeInsert(interaction) {
   const traderRole = resolveTraderRole(interaction.guild);
