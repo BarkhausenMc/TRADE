@@ -35,6 +35,8 @@ import {
 import { setCompletedTrades } from './panel.js';
 import { pushSpawner, removeSpawner } from '../hugoguard/hugoguard.js';
 
+import { logInteractionError } from './logger.js';
+
 import {
   addTicketBan,
   getTicketBan,
@@ -52,6 +54,25 @@ function canManageTicketBans(interaction) {
 
 export function registerInteractions(client) {
   client.on('interactionCreate', async interaction => {
+    try {
+      await handleInteraction(interaction);
+    } catch (error) {
+      console.error('[INTERACTION ERROR]', error);
+
+      logInteractionError(
+        {
+          interaction,
+          note: interaction.isChatInputCommand()
+            ? 'Slash-Command fehlgeschlagen'
+            : 'Komponenten-Interaktion fehlgeschlagen'
+        },
+        error
+      ).catch(() => {});
+    }
+  });
+}
+
+async function handleInteraction(interaction) {
     if (interaction.isButton() && interaction.customId === 'spawner_price_role') {
       return handleSpawnerPriceRole(interaction);
     }
@@ -119,7 +140,7 @@ export function registerInteractions(client) {
           components: [
             buildNotice(
               '🚫 Du darfst keine Tickets mehr erstellen.\n' +
-              `**Grund:** $DIL2`
+              `**Grund:** $DIL2`
             )
           ],
           flags: noticeFlags
@@ -211,7 +232,7 @@ export function registerInteractions(client) {
 
     if (!interaction.isChatInputCommand()) return;
 
-    
+
     // =====================================
     // TICKET BAN SYSTEM
     // =====================================
@@ -441,7 +462,6 @@ export function registerInteractions(client) {
     });
   }
 }
-  });
 }
 
 async function handleSpawnerPriceRole(interaction) {
@@ -744,4 +764,3 @@ async function handleSpawnerRemove(interaction) {
   });
 
 }
-

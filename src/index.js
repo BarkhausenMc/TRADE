@@ -11,6 +11,13 @@ import { bindPanelClient } from './discord/panel.js';
 import { bindPriceLogClient } from './discord/price-log.js';
 import { bindTicketClient } from './discord/tickets.js';
 
+import {
+  bindLogger,
+  logBotStart,
+  logGuildMemberJoin,
+  logGuildMemberLeave
+} from './discord/logger.js';
+
 import { createClient } from './discord/client.js';
 
 const client = createClient();
@@ -81,12 +88,35 @@ client.once('clientReady', async () => {
   console.log(gradient('          ✨ TRADE BOT ONLINE ✨'));
 
   restorePriceLog();
+
+  logBotStart().catch(() => {});
 });
 
 registerInteractions(client);
 bindPanelClient(client);
 bindPriceLogClient(client);
 bindTicketClient(client);
+bindLogger(client);
+
+client.on('guildMemberAdd', member => {
+  logGuildMemberJoin(member).catch(() => {});
+});
+
+client.on('guildMemberRemove', member => {
+  logGuildMemberLeave(member).catch(() => {});
+});
+
+client.on('shardDisconnect', event => {
+  console.warn('[DISCORD] Verbindung getrennt:', event?.code);
+});
+
+client.on('shardReconnecting', () => {
+  console.warn('[DISCORD] Neuverbindung läuft...');
+});
+
+client.on('shardResume', id => {
+  console.log(`[DISCORD] Shard ${id} wieder verbunden.`);
+});
 
 attach(client);
 

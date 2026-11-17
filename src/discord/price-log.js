@@ -12,6 +12,8 @@ import {
   PRICE_LOG_TIMEOUT
 } from './context.js';
 
+import { logPriceChange } from './logger.js';
+
 const PRICE_LOG_FILE_URL = new URL('../../data/price-log.json', import.meta.url);
 
 let discordClient = null;
@@ -131,6 +133,13 @@ export async function updatePriceLog(interaction, spawner, changes) {
     savePriceLog();
 
     armPriceLogDeletion();
+
+    logPriceChange(
+      spawner.name,
+      spawner.emoji,
+      changes.join('\n'),
+      interaction.user.id
+    ).catch(() => {});
 
     if (roleId) {
       try {

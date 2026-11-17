@@ -32,6 +32,14 @@ import {
 import { updateSpawnerPanel } from './panel.js';
 import { getTicketBan } from '../db/database.js';
 
+import {
+  logTicketCreated,
+  logTicketClaimed,
+  logTicketReleased,
+  logTicketCompleted,
+  logTicketCancelled
+} from './logger.js';
+
 let discordClient = null;
 
 export function bindTicketClient(client) {
@@ -245,7 +253,7 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       components: [
         buildNotice(
           '🚫 Du bist vom Erstellen neuer Tickets ausgeschlossen.\n' +
-          `**Grund:** $DIL1`
+          `**Grund:** $DIL1`
         )
       ],
       flags: noticeFlags
@@ -327,13 +335,11 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       abgeschlossen: false
     };
 
-    // Ticket-Container senden
     const ticketMessage = await thread.send({
       components: createTicketComponents(ticket),
       flags: MessageFlags.IsComponentsV2
     });
 
-    // WICHTIG: Message-ID und Ticket speichern
     ticket.messageId = ticketMessage.id;
     ticketData.tickets[thread.id] = ticket;
 
@@ -345,7 +351,9 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       savedTickets: Object.keys(ticketData.tickets)
     });
 
-    // Trader-Ping unter dem Container
+    logTicketCreated(ticket, `https://discord.com/channels/${interaction.guild.id}/${thread.id}`)
+      .catch(() => {});
+
     if (traderRole) {
       await thread.send({
         content: `||**<@&${traderRole.id}> — Neuer Trade von \`${ingameName}\`**!||`,
@@ -436,6 +444,8 @@ export async function handleTicketClaim(interaction) {
     ],
     flags: publicFlags
   });
+
+  logTicketClaimed(ticket, interaction.user.id).catch(() => {});
 }
 
 export async function handleTicketRelease(interaction) {
@@ -486,6 +496,8 @@ export async function handleTicketRelease(interaction) {
     ],
     flags: publicFlags
   });
+
+  logTicketReleased(ticket, previousClaimer).catch(() => {});
 }
 
 export async function handleTicketSold(interaction) {
@@ -518,7 +530,6 @@ export async function handleTicketSold(interaction) {
 
     saveTickets();
 
-    // Spawner-Panel aktualisieren
     await updateSpawnerPanel();
 
   await updateTicketMessage(interaction.channel, ticket);
@@ -536,6 +547,8 @@ export async function handleTicketSold(interaction) {
     ],
     flags: publicFlags
   });
+
+  logTicketCompleted(ticket, interaction.user.id).catch(() => {});
 
   setTimeout(async () => {
     delete ticketData.tickets[interaction.channel.id];
@@ -567,6 +580,8 @@ export async function handleTicketCancel(interaction) {
     components: [buildNotice('🗑️ Dieses Ticket wird in **5 Sekunden** gelöscht.')],
     flags: noticeFlags
   });
+
+  logTicketCancelled(ticket).catch(() => {});
 
   setTimeout(async () => {
     delete ticketData.tickets[interaction.channel.id];
