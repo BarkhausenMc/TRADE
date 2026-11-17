@@ -1,10 +1,11 @@
 
+import { MessageFlags } from 'discord.js';
+
 import {
   getTraderStats,
   getTradeLeaderboard,
   getTradeHistory,
   createTrade,
-  getTradeById,
   correctTrade,
   deleteTrade
 } from '../db/database.js';
@@ -13,12 +14,12 @@ import {
   isTraderMember,
   resolveTraderRole,
   buildNotice,
-  noticeFlags
+  noticeFlags,
+  hasTradeLeaderRole
 } from './context.js';
 
-import { hasTradeLeaderRole } from './context.js';
 import { updateTradePanel } from './trade-panel.js';
-import { MessageFlags } from 'discord.js';
+
 const SOURCES = [
   'Ingame-Chat',
   'HugoSMP-Market',
@@ -46,9 +47,11 @@ function validSource(source) {
   return SOURCES.includes(source);
 }
 
-
 export async function handleTradeCommand(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  // Interaction sofort bestätigen
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  });
 
   try {
     const subcommand = interaction.options.getSubcommand();
@@ -58,53 +61,78 @@ export async function handleTradeCommand(interaction) {
     const isTrader = isTraderMember(interaction, traderRole);
     const isLeader = hasTradeLeaderRole(interaction);
 
+    // Allgemeine Berechtigungsprüfung
     if (!isTrader && !isLeader) {
       return interaction.editReply({
         content: '❌ Du benötigst die Trader-Rolle oder TRADE Leader-Rolle.'
       });
     }
 
-    if (['korrigieren', 'löschen'].includes(subcommand) && !isLeader) {
+    // Nur Leader dürfen korrigieren und löschen
+    if (
+      ['korrigieren', 'löschen'].includes(subcommand) &&
+      !isLeader
+    ) {
       return interaction.editReply({
         content: '❌ Nur TRADE Leader dürfen diese Aktion durchführen.'
       });
     }
 
-    if (subcommand === 'eintragen') return handleTradeInsert(interaction);
-    if (subcommand === 'stats') return handleTradeStats(interaction);
-    if (subcommand === 'leaderboard') return handleLeaderboard(interaction);
-    if (subcommand === 'historie') return handleHistory(interaction);
-    if (subcommand === 'korrigieren') return handleCorrection(interaction);
-    if (subcommand === 'löschen') return handleDeletion(interaction);
+    switch (subcommand) {
+      case 'eintragen':
+        return await handleTradeInsert(interaction);
+
+      case 'stats':
+        return await handleTradeStats(interaction);
+
+      case 'leaderboard':
+        return await handleLeaderboard(interaction);
+
+      case 'historie':
+        return await handleHistory(interaction);
+
+      case 'korrigieren':
+        return await handleCorrection(interaction);
+
+      case 'löschen':
+        return await handleDeletion(interaction);
+
+      default:
+        return interaction.editReply({
+          content: '❌ Unbekannter Trade-Befehl.'
+        });
+    }
 
   } catch (error) {
-    console.error('Trade Command Error:', error);
+    console.error('[TRADE COMMAND ERROR]', error);
 
-    return interaction.editReply({
-      content: '❌ Beim Ausführen des Trade-Befehls ist ein Fehler aufgetreten.'
-    }).catch(console.error);
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply({
+        content: '❌ Beim Ausführen des Trade-Befehls ist ein Fehler aufgetreten.'
+      }).catch(console.error);
+    }
   }
 }
 
+
+// =====================================
+// TRADE EINTRAGEN
+// =====================================
 
 async function handleTradeInsert(interaction) {
   const traderRole = resolveTraderRole(interaction.guild);
 
   if (!isTraderMember(interaction, traderRole)) {
-    return interaction.reply({
-      components: [
-        buildNotice('❌ Nur Mitglieder der Trader-Rolle dürfen Trades eintragen.')
-      ],
-      flags: noticeFlags
+    return interaction.editReply({
+      content: '❌ Nur Mitglieder der Trader-Rolle dürfen Trades eintragen.'
     });
   }
 
   const source = interaction.options.getString('quelle', true);
 
   if (!validSource(source)) {
-    return interaction.reply({
-      content: '❌ Ungültige Trade-Quelle.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Ungültige Trade-Quelle.'
     });
   }
 
@@ -116,9 +144,8 @@ async function handleTradeInsert(interaction) {
   });
 
   if (!result.success) {
-    return interaction.reply({
-      content: '❌ Dieser Trade wurde bereits eingetragen.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Dieser Trade wurde bereits eingetragen.'
     });
   }
 
@@ -129,20 +156,24 @@ async function handleTradeInsert(interaction) {
 
   await updateTradePanel(interaction.guild.id);
 
-  return interaction.reply({
+  return interaction.editReply({
     content:
       `✅ Dein Trade wurde eingetragen!\n\n` +
       `**Quelle:** ${getSourceName(source)}\n` +
       `**Diese Woche:** ${stats.weekly}\n` +
       `**Dieser Monat:** ${stats.monthly}\n` +
-      `**All Time:** ${stats.allTime}`,
-    ephemeral: true
+      `**All Time:** ${stats.allTime}`
   });
 }
 
 
+// =====================================
+// TRADE STATISTIK
+// =====================================
+
 async function handleTradeStats(interaction) {
-  const user = interaction.options.getUser('trader') || interaction.user;
+  const user =
+    interaction.options.getUser('trader') || interaction.user;
 
   const stats = getTraderStats(
     interaction.guild.id,
@@ -164,6 +195,10 @@ async function handleTradeStats(interaction) {
 }
 
 
+// =====================================
+// TRADE LEADERBOARD
+// =====================================
+
 async function handleLeaderboard(interaction) {
   const period = interaction.options.getString('zeitraum', true);
 
@@ -173,9 +208,8 @@ async function handleLeaderboard(interaction) {
   );
 
   if (!entries.length) {
-    return interaction.reply({
-      content: 'Es gibt für diesen Zeitraum noch keine Trades.',
-      ephemeral: true
+    return interaction.editReply({
+      content: 'Es gibt für diesen Zeitraum noch keine Trades.'
     });
   }
 
@@ -183,7 +217,7 @@ async function handleLeaderboard(interaction) {
     weekly: 'DIESE WOCHE',
     monthly: 'DIESEN MONAT',
     all: 'ALL TIME'
-  }[period];
+  }[period] || 'TRADE LEADERBOARD';
 
   const medals = ['🥇', '🥈', '🥉'];
 
@@ -193,7 +227,7 @@ async function handleLeaderboard(interaction) {
     return `${rank} <@${entry.trader_id}> — **${entry.trades} Trades**`;
   });
 
-  return interaction.reply({
+  return interaction.editReply({
     components: [
       buildNotice(
         `# 🏆 TRADE LEADERBOARD\n` +
@@ -201,9 +235,14 @@ async function handleLeaderboard(interaction) {
         lines.join('\n')
       )
     ],
-    flags: noticeFlags
+    flags: MessageFlags.IsComponentsV2
   });
 }
+
+
+// =====================================
+// TRADE HISTORIE
+// =====================================
 
 async function handleHistory(interaction) {
   const user = interaction.options.getUser('trader');
@@ -215,9 +254,8 @@ async function handleHistory(interaction) {
   );
 
   if (!history.length) {
-    return interaction.reply({
-      content: 'Es wurden keine Trades gefunden.',
-      ephemeral: true
+    return interaction.editReply({
+      content: 'Es wurden keine Trades gefunden.'
     });
   }
 
@@ -226,21 +264,25 @@ async function handleHistory(interaction) {
     `${getSourceName(trade.source)} · ${formatDate(trade.created_at)}`
   );
 
-  return interaction.reply({
+  return interaction.editReply({
     components: [
       buildNotice(
         `# 📜 TRADE HISTORIE\n\n${lines.join('\n\n')}`
       )
     ],
-    flags: noticeFlags
+    flags: MessageFlags.IsComponentsV2
   });
 }
 
+
+// =====================================
+// TRADE KORRIGIEREN
+// =====================================
+
 async function handleCorrection(interaction) {
   if (!isTradeLeader(interaction)) {
-    return interaction.reply({
-      content: '❌ Nur die konfigurierte TRADE_LEADER_ROLE_ID darf Trades korrigieren.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Nur TRADE Leader dürfen Trades korrigieren.'
     });
   }
 
@@ -250,9 +292,8 @@ async function handleCorrection(interaction) {
   const reason = interaction.options.getString('grund', true).trim();
 
   if (!validSource(source) || !reason) {
-    return interaction.reply({
-      content: '❌ Ungültige Quelle oder fehlender Grund.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Ungültige Quelle oder fehlender Grund.'
     });
   }
 
@@ -266,25 +307,27 @@ async function handleCorrection(interaction) {
   });
 
   if (!result) {
-    return interaction.reply({
-      content: '❌ Trade nicht gefunden oder bereits gelöscht.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Trade nicht gefunden oder bereits gelöscht.'
     });
   }
 
   await updateTradePanel(interaction.guild.id);
 
-  return interaction.reply({
-    content: `✅ Trade #${tradeId} wurde korrigiert.`,
-    ephemeral: true
+  return interaction.editReply({
+    content: `✅ Trade #${tradeId} wurde korrigiert.`
   });
 }
 
+
+// =====================================
+// TRADE LÖSCHEN
+// =====================================
+
 async function handleDeletion(interaction) {
   if (!isTradeLeader(interaction)) {
-    return interaction.reply({
-      content: '❌ Nur die konfigurierte TRADE_LEADER_ROLE_ID darf Trades löschen.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Nur TRADE Leader dürfen Trades löschen.'
     });
   }
 
@@ -292,9 +335,8 @@ async function handleDeletion(interaction) {
   const reason = interaction.options.getString('grund', true).trim();
 
   if (!reason) {
-    return interaction.reply({
-      content: '❌ Bitte gib einen Löschgrund an.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Bitte gib einen Löschgrund an.'
     });
   }
 
@@ -306,16 +348,14 @@ async function handleDeletion(interaction) {
   });
 
   if (!result) {
-    return interaction.reply({
-      content: '❌ Trade nicht gefunden oder bereits gelöscht.',
-      ephemeral: true
+    return interaction.editReply({
+      content: '❌ Trade nicht gefunden oder bereits gelöscht.'
     });
   }
 
   await updateTradePanel(interaction.guild.id);
 
-  return interaction.reply({
-    content: `🗑️ Trade #${tradeId} wurde gelöscht und aus den Statistiken entfernt.`,
-    ephemeral: true
+  return interaction.editReply({
+    content: `🗑️ Trade #${tradeId} wurde gelöscht und aus den Statistiken entfernt.`
   });
 }
