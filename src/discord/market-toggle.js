@@ -4,7 +4,12 @@ import path from 'node:path';
 
 import { MessageFlags } from 'discord.js';
 
-import { buildNotice, noticeFlags } from './context.js';
+import {
+  buildNotice,
+  noticeFlags,
+  hasTradeLeaderRole
+} from './context.js';
+
 import { isAuthorizedUser } from './roles.js';
 
 const STATE_PATH = path.resolve('data', 'market-toggle.json');
@@ -76,11 +81,17 @@ export function buildMarketDisabledNotice(mode) {
   };
 }
 
+export function canToggleMarket(interaction) {
+  return hasTradeLeaderRole(interaction) || isAuthorizedUser(interaction);
+}
+
 export async function handleToggleMarket(interaction) {
-  if (!isAuthorizedUser(interaction)) {
+  if (!canToggleMarket(interaction)) {
     return interaction.reply({
       components: [
-        buildNotice('❌ Du bist nicht berechtigt, diesen Befehl zu nutzen.')
+        buildNotice(
+          '❌ Du benötigst die **TRADE leader** Rolle oder entsprechende Berechtigung, um diesen Befehl zu nutzen.'
+        )
       ],
       flags: noticeFlags
     });
