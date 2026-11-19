@@ -1,0 +1,25 @@
+Projekt-Root
+├── data/
+│   └── public/
+│       └── login.html
+├── src/
+│   ├── db/
+│   │   ├── api-server.js
+│   │   └── database.js
+│   ├── discord/
+│   │   ├── client.js
+│   │   ├── context.js
+│   │   ├── interactions.js
+│   │   ├── panel.js
+│   │   ├── price-log.js      
+│   │   └── tickets.js
+│   ├── hugoguard/
+│   │   └── hugoguard.js
+│   └── minecraft/
+│       └── bot.js
+├── .gitignore
+├── deploy-commands.js
+├── index-backup.js
+├── index.js
+├── minecraft-backup.js
+└── package.json

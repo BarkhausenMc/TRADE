@@ -46,6 +46,12 @@ import {
 import { handleTradeCommand } from './trades.js';
 import { setupTradePanel } from './trade-panel.js';
 
+import { handleGiveRole, handleRemoveRole } from './roles.js';
+import {
+  handleAdminPanelCommand,
+  handleAdminPanelComponent
+} from './admin-panel.js';
+
 function canManageTicketBans(interaction) {
   return (
     interaction.memberPermissions?.has(
@@ -76,6 +82,24 @@ export function registerInteractions(client) {
 }
 
 async function handleInteraction(interaction) {
+    if (interaction.isButton() && interaction.customId.startsWith('admin_')) {
+      return handleAdminPanelComponent(interaction);
+    }
+
+    if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === 'give-role') {
+        return handleGiveRole(interaction);
+      }
+
+      if (interaction.commandName === 'remove-role') {
+        return handleRemoveRole(interaction);
+      }
+
+      if (interaction.commandName === 'setup-admin-panel') {
+        return handleAdminPanelCommand(interaction);
+      }
+    }
+
     if (interaction.isButton() && interaction.customId === 'spawner_price_role') {
       return handleSpawnerPriceRole(interaction);
     }

@@ -343,6 +343,42 @@ const commands = [
     .setName('setup-trade-panel')
     .setDescription('Erstellt oder aktualisiert das Trade-Statistik-Panel'),
 
+  new SlashCommandBuilder()
+    .setName('give-role')
+    .setDescription('Gibt einem Nutzer eine Rolle')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('Der Nutzer, der die Rolle erhalten soll')
+        .setRequired(true)
+    )
+    .addRoleOption(option =>
+      option
+        .setName('role')
+        .setDescription('Die Rolle, die vergeben werden soll')
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('remove-role')
+    .setDescription('Entfernt einem Nutzer eine Rolle')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('Der Nutzer, dem die Rolle entfernt werden soll')
+        .setRequired(true)
+    )
+    .addRoleOption(option =>
+      option
+        .setName('role')
+        .setDescription('Die Rolle, die entfernt werden soll')
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('setup-admin-panel')
+    .setDescription('Zeigt dir das Admin-Panel (nur für dich sichtbar)'),
+
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
@@ -357,4 +393,3 @@ try {
 } catch (error) {
   console.error(error);
 }
-
