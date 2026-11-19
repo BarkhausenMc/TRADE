@@ -46,7 +46,11 @@ import {
 import { handleTradeCommand } from './trades.js';
 import { setupTradePanel } from './trade-panel.js';
 
-import { handleGiveRole, handleRemoveRole } from './roles.js';
+import {
+  handleGiveRole,
+  handleRemoveRole,
+  handleShowRoles
+} from './roles.js';
 import {
   handleAdminPanelCommand,
   handleAdminPanelComponent
@@ -97,6 +101,10 @@ async function handleInteraction(interaction) {
 
       if (interaction.commandName === 'setup-admin-panel') {
         return handleAdminPanelCommand(interaction);
+      }
+
+      if (interaction.commandName === 'show-roles') {
+        return handleShowRoles(interaction);
       }
     }
 

@@ -379,6 +379,10 @@ const commands = [
     .setName('setup-admin-panel')
     .setDescription('Zeigt dir das Admin-Panel (nur für dich sichtbar)'),
 
+  new SlashCommandBuilder()
+    .setName('show-roles')
+    .setDescription('Zeigt alle Rollen und welche Nutzer sie besitzen (nur für dich sichtbar)'),  
+
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);

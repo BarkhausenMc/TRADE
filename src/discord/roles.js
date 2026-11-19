@@ -1,4 +1,8 @@
-import { MessageFlags } from 'discord.js';
+import {
+  ContainerBuilder,
+  MessageFlags,
+  TextDisplayBuilder
+} from 'discord.js';
 
 import { buildNotice, noticeFlags } from './context.js';
 import { sendLog } from './logger.js';
@@ -130,4 +134,86 @@ export async function handleGiveRole(interaction) {
 
 export async function handleRemoveRole(interaction) {
   return changeRole(interaction, 'remove');
+}
+
+export async function handleShowRoles(interaction) {
+  if (!isAuthorizedUser(interaction)) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Du bist nicht berechtigt, diesen Befehl zu nutzen.')
+      ],
+      flags: noticeFlags
+    });
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  let members = null;
+
+  try {
+    members = await interaction.guild.members.fetch();
+  } catch (error) {
+    console.error('[SHOW ROLES MEMBERS ERROR]', error);
+  }
+
+  const roles = interaction.guild.roles.cache
+    .filter(role => role.id !== interaction.guild.id)
+    .sort((a, b) => b.position - a.position)
+    .toSorted
+    ? null
+    : null;
+
+  const roleList = [...interaction.guild.roles.cache.values()]
+    .filter(role => role.id !== interaction.guild.id)
+    .sort((a, b) => b.position - a.position);
+
+  if (roleList.length === 0) {
+    return replyNotice(interaction, '⚠️ Auf diesem Server existieren keine Rollen.');
+  }
+
+  const sections = roleList.map(role => {
+    const holders = members
+      ? [...members.values()]
+          .filter(member => member.roles.cache.has(role.id))
+          .map(member => '<@' + member.id + '>')
+      : [];
+
+    return (
+      '## 🏷️ ' + role.name + ' (' + holders.length + ')\n' +
+      (holders.length ? holders.join(', ') : '*Niemand besitzt diese Rolle.*')
+    );
+  });
+
+  const pages = [];
+  let currentPage = '# 👥 ROLLEN-ÜBERSICHT\n\n';
+
+  for (const section of sections) {
+    if (currentPage.length + section.length + 2 > 3500) {
+      pages.push(currentPage);
+      currentPage = '# 👥 ROLLEN-ÜBERSICHT (Fortsetzung)\n\n';
+    }
+
+    currentPage += section + '\n\n';
+  }
+
+  if (currentPage.trim()) {
+    pages.push(currentPage);
+  }
+
+  const toContainer = content =>
+    new ContainerBuilder().addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(content)
+    );
+
+  await interaction.editReply({
+    components: [toContainer(pages[0])],
+    flags: noticeFlags
+  });
+
+  for (let i = 1; i < pages.length; i++) {
+    await interaction.followUp({
+      components: [toContainer(pages[i])],
+      flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2
+    });
+  }
 }
