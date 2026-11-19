@@ -23,6 +23,8 @@ import {
 
 import { setPanelData } from './context.js';
 
+import { isMarketEnabled } from './market-toggle.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 
@@ -71,6 +73,24 @@ export function createSpawnerPanel() {
     container.addSeparatorComponents(new SeparatorBuilder());
   }
 
+  const disabledLines = [];
+
+  if (!isMarketEnabled('kaufen')) {
+    disabledLines.push('⛔ Kaufen derzeit nicht möglich');
+  }
+
+  if (!isMarketEnabled('verkauf')) {
+    disabledLines.push('⛔ Verkauf derzeit nicht möglich');
+  }
+
+  if (disabledLines.length > 0) {
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(disabledLines.join('\n'))
+    );
+
+    container.addSeparatorComponents(new SeparatorBuilder());
+  }
+
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
       '-# Preise werden und können jederzeit durch das TRADE Team geändert'
@@ -86,12 +106,14 @@ export function createTicketButtonRow() {
       .setCustomId('ticket_verkaufen')
       .setLabel('Ich möchte meine Spawner Verkaufen')
       .setEmoji('💰')
-      .setStyle(ButtonStyle.Success),
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!isMarketEnabled('verkauf')),
     new ButtonBuilder()
       .setCustomId('ticket_kaufen')
       .setLabel('Ich möchte Spawner Kaufen')
       .setEmoji('🛒')
-      .setStyle(ButtonStyle.Primary),
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(!isMarketEnabled('kaufen')),
     new ButtonBuilder()
       .setCustomId('spawner_price_role')
       .setLabel('Spawer Ping Rolle')
