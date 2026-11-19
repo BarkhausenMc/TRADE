@@ -106,6 +106,19 @@ export async function handleToggleMarket(interaction) {
     }
   }
 
+  console.log('[MARKET TOGGLE] Neuer Zustand:', state);
+
+  let panelUpdated = null;
+
+  try {
+    const { updateSpawnerPanel } = await import('./panel.js');
+
+    panelUpdated = await updateSpawnerPanel();
+  } catch (error) {
+    console.error('[MARKET TOGGLE PANEL UPDATE ERROR]', error);
+    panelUpdated = false;
+  }
+
   const line = mode =>
     (mode === 'kaufen' ? '🛒 **Kaufen-Button:** ' : '💰 **Verkaufen-Button:** ') +
     (isMarketEnabled(mode) ? '🟩 Aktiv' : '🟥 Deaktiviert');
@@ -115,7 +128,12 @@ export async function handleToggleMarket(interaction) {
       buildNotice(
         '✅ Market-Buttons aktualisiert:\n\n' +
         modes.map(line).join('\n') +
-        '\n\n-# Wenn das Spawner-Panel aktiv ist, nutze `/setup-spawner` oder das Admin-Panel, damit die Buttons dort sofort ausgegraut werden.'
+        '\n\n' +
+        (panelUpdated
+          ? '🛒 Das Spawner-Panel wurde automatisch aktualisiert.'
+          : panelUpdated === false
+            ? '⚠️ Zustand gespeichert, aber das Spawner-Panel konnte nicht aktualisiert werden. Nutze `/setup-spawner`.'
+            : '🛒 Spawner-Panel nicht eingerichtet – Zustand wurde trotzdem gespeichert.')
       )
     ],
     flags: noticeFlags
