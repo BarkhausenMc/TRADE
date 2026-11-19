@@ -56,6 +56,12 @@ import {
   handleAdminPanelComponent
 } from './admin-panel.js';
 
+import {
+  handleToggleMarket,
+  isMarketEnabled,
+  buildMarketDisabledNotice
+} from './market-toggle.js';
+
 function canManageTicketBans(interaction) {
   return (
     interaction.memberPermissions?.has(
@@ -105,6 +111,10 @@ async function handleInteraction(interaction) {
 
       if (interaction.commandName === 'show-roles') {
         return handleShowRoles(interaction);
+      }
+
+      if (interaction.commandName === 'toggle-market') {
+        return handleToggleMarket(interaction);
       }
     }
 
@@ -186,6 +196,10 @@ async function handleInteraction(interaction) {
         interaction.customId === 'ticket_kaufen'
           ? 'kaufen'
           : 'verkaufen';
+
+      if (!isMarketEnabled(mode)) {
+        return interaction.reply(buildMarketDisabledNotice(mode));
+      }
 
       if (spawners.length === 0) {
         return interaction.reply({

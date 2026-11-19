@@ -379,7 +379,7 @@ const commands = [
     .setName('setup-admin-panel')
     .setDescription('Zeigt dir das Admin-Panel (nur für dich sichtbar)'),
 
-new SlashCommandBuilder()
+  new SlashCommandBuilder()
     .setName('show-roles')
     .setDescription('Zeigt Rollen und deren Nutzer (nur für dich sichtbar)')
     .addRoleOption(option =>
@@ -387,6 +387,31 @@ new SlashCommandBuilder()
         .setName('role')
         .setDescription('Rolle, deren Nutzer aufgelistet werden sollen (optional)')
         .setRequired(false)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('toggle-market')
+    .setDescription('Aktiviert oder deaktiviert die Kaufen/Verkaufen-Buttons im Spawner-Panel')
+    .addStringOption(option =>
+      option
+        .setName('button')
+        .setDescription('Welcher Button soll umgestellt werden?')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Kaufen', value: 'kaufen' },
+          { name: 'Verkaufen', value: 'verkauf' },
+          { name: 'Beide', value: 'beide' }
+        )
+    )
+    .addStringOption(option =>
+      option
+        .setName('status')
+        .setDescription('Neuer Status (ohne Angabe wird umgeschaltet)')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Aktivieren', value: 'aktivieren' },
+          { name: 'Deaktivieren', value: 'deaktivieren' }
+        )
     ),
 
 ].map(command => (command.toJSON ? command.toJSON() : command));

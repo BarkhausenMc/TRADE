@@ -30,6 +30,7 @@ import { createPanelComponents, updateSpawnerPanel } from './panel.js';
 import { updateTradePanel } from './trade-panel.js';
 import { createPriceLogContainer, deletePriceLog } from './price-log.js';
 import { isAuthorizedUser } from './roles.js';
+import { isMarketEnabled, toggleMarket } from './market-toggle.js';
 import { bot } from '../minecraft/bot.js';
 
 let discordClient = null;
@@ -233,6 +234,17 @@ function buildPanelsPage() {
     new TextDisplayBuilder().setContent('💸 **Price-Log**\n' + priceStatus)
   );
 
+  container.addSeparatorComponents(new SeparatorBuilder());
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      '🏪 **MARKET-BUTTONS**\n' +
+      '🛒 **Kaufen:** ' + (isMarketEnabled('kaufen') ? '🟩 Aktiv' : '🟥 Deaktiviert') + '\n' +
+      '💰 **Verkaufen:** ' + (isMarketEnabled('verkauf') ? '🟩 Aktiv' : '🟥 Deaktiviert') +
+      '\n-# Deaktivierte Buttons sind im Spawner-Panel ausgegraut und können von Nutzern nicht genutzt werden.'
+    )
+  );
+
   if (lastActionText) {
     container.addSeparatorComponents(new SeparatorBuilder());
 
@@ -281,6 +293,24 @@ function buildNavRow(page) {
   );
 }
 
+function buildMarketToggleRow() {
+  const kaufenActive = isMarketEnabled('kaufen');
+  const verkaufActive = isMarketEnabled('verkauf');
+
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('admin_action_toggle_kaufen')
+      .setLabel(kaufenActive ? 'Kaufen: AKTIV' : 'Kaufen: AUS')
+      .setEmoji('🛒')
+      .setStyle(kaufenActive ? ButtonStyle.Success : ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('admin_action_toggle_verkauf')
+      .setLabel(verkaufActive ? 'Verkaufen: AKTIV' : 'Verkaufen: AUS')
+      .setEmoji('💰')
+      .setStyle(verkaufActive ? ButtonStyle.Success : ButtonStyle.Danger)
+  );
+}
+
 function buildPanelActionRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -316,12 +346,25 @@ async function buildAdminComponents(guild, page) {
 
   if (page === 'panels') {
     components.push(buildPanelActionRow());
+    components.push(buildMarketToggleRow());
   }
 
   return components;
 }
 
 async function runPanelAction(action, interaction) {
+  if (action === 'toggle_kaufen' || action === 'toggle_verkauf') {
+    const mode = action === 'toggle_kaufen' ? 'kaufen' : 'verkauf';
+    const enabled = toggleMarket(mode);
+
+    const label = mode === 'kaufen' ? 'Kaufen' : 'Verkaufen';
+
+    updateSpawnerPanel().catch(() => {});
+
+    return (enabled ? '🛒 ' : '⛔ ') + label + '-Button ist jetzt ' +
+      (enabled ? '**aktiv**.' : '**deaktiviert**.');
+  }
+
   if (action === 'render_spawner') {
     const ok = await updateSpawnerPanel();
 
