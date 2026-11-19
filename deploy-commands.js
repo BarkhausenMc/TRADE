@@ -379,9 +379,15 @@ const commands = [
     .setName('setup-admin-panel')
     .setDescription('Zeigt dir das Admin-Panel (nur für dich sichtbar)'),
 
-  new SlashCommandBuilder()
+new SlashCommandBuilder()
     .setName('show-roles')
-    .setDescription('Zeigt alle Rollen und welche Nutzer sie besitzen (nur für dich sichtbar)'),  
+    .setDescription('Zeigt Rollen und deren Nutzer (nur für dich sichtbar)')
+    .addRoleOption(option =>
+      option
+        .setName('role')
+        .setDescription('Rolle, deren Nutzer aufgelistet werden sollen (optional)')
+        .setRequired(false)
+    ),
 
 ].map(command => (command.toJSON ? command.toJSON() : command));
 

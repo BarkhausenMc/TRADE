@@ -136,61 +136,25 @@ export async function handleRemoveRole(interaction) {
   return changeRole(interaction, 'remove');
 }
 
-export async function handleShowRoles(interaction) {
-  if (!isAuthorizedUser(interaction)) {
-    return interaction.reply({
-      components: [
-        buildNotice('❌ Du bist nicht berechtigt, diesen Befehl zu nutzen.')
-      ],
-      flags: noticeFlags
-    });
-  }
-
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-  let members = null;
-
+async function fetchGuildMembers(interaction) {
   try {
-    members = await interaction.guild.members.fetch();
+    return await interaction.guild.members.fetch();
   } catch (error) {
     console.error('[SHOW ROLES MEMBERS ERROR]', error);
+
+    return null;
   }
+}
 
-  const roles = interaction.guild.roles.cache
-    .filter(role => role.id !== interaction.guild.id)
-    .sort((a, b) => b.position - a.position)
-    .toSorted
-    ? null
-    : null;
-
-  const roleList = [...interaction.guild.roles.cache.values()]
-    .filter(role => role.id !== interaction.guild.id)
-    .sort((a, b) => b.position - a.position);
-
-  if (roleList.length === 0) {
-    return replyNotice(interaction, '⚠️ Auf diesem Server existieren keine Rollen.');
-  }
-
-  const sections = roleList.map(role => {
-    const holders = members
-      ? [...members.values()]
-          .filter(member => member.roles.cache.has(role.id))
-          .map(member => '<@' + member.id + '>')
-      : [];
-
-    return (
-      '## 🏷️ ' + role.name + ' (' + holders.length + ')\n' +
-      (holders.length ? holders.join(', ') : '*Niemand besitzt diese Rolle.*')
-    );
-  });
-
+function chunkPages(header, sections) {
   const pages = [];
-  let currentPage = '# 👥 ROLLEN-ÜBERSICHT\n\n';
+  let currentPage = header;
 
   for (const section of sections) {
     if (currentPage.length + section.length + 2 > 3500) {
       pages.push(currentPage);
-      currentPage = '# 👥 ROLLEN-ÜBERSICHT (Fortsetzung)\n\n';
+
+      currentPage = header + ' (Fortsetzung)\n\n';
     }
 
     currentPage += section + '\n\n';
@@ -200,6 +164,10 @@ export async function handleShowRoles(interaction) {
     pages.push(currentPage);
   }
 
+  return pages;
+}
+
+async function sendEphemeralPages(interaction, pages) {
   const toContainer = content =>
     new ContainerBuilder().addTextDisplayComponents(
       new TextDisplayBuilder().setContent(content)
@@ -216,4 +184,80 @@ export async function handleShowRoles(interaction) {
       flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2
     });
   }
+}
+
+async function showRoleMembers(interaction, role, members) {
+  if (!members) {
+    return replyNotice(
+      interaction,
+      '❌ Die Mitglieder konnten nicht geladen werden. Bitte versuche es erneut.'
+    );
+  }
+
+  const holders = [...members.values()]
+    .filter(member => member.roles.cache.has(role.id))
+    .map(member => '<@' + member.id + '>');
+
+  const header =
+    '# 👥 ' + role.name + '\n' +
+    '*Alle Nutzer mit dieser Rolle*';
+
+  if (holders.length === 0) {
+    return replyNotice(
+      interaction,
+      '⚠️ Niemand auf diesem Server besitzt die Rolle ' + role + '.'
+    );
+  }
+
+  const sections = holders.map(holder => '- ' + holder);
+
+  const pages = chunkPages(header + '\n**' + holders.length + ' Nutzer**\n', sections);
+
+  return sendEphemeralPages(interaction, pages);
+}
+
+async function showAllRoles(interaction) {
+  const roleList = [...interaction.guild.roles.cache.values()]
+    .filter(role => role.id !== interaction.guild.id)
+    .sort((a, b) => b.position - a.position);
+
+  if (roleList.length === 0) {
+    return replyNotice(interaction, '⚠️ Auf diesem Server existieren keine Rollen.');
+  }
+
+  const sections = roleList.map(role => {
+    const icon = role.icon ? role.icon + ' ' : '';
+
+    return '- ' + icon + role.name;
+  });
+
+  const pages = chunkPages(
+    '# 🏷️ ROLLEN-ÜBERSICHT\n**' + roleList.length + ' Rollen**\n',
+    sections
+  );
+
+  return sendEphemeralPages(interaction, pages);
+}
+
+export async function handleShowRoles(interaction) {
+  if (!isAuthorizedUser(interaction)) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Du bist nicht berechtigt, diesen Befehl zu nutzen.')
+      ],
+      flags: noticeFlags
+    });
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const role = interaction.options.getRole('role');
+
+  if (role) {
+    const members = await fetchGuildMembers(interaction);
+
+    return showRoleMembers(interaction, role, members);
+  }
+
+  return showAllRoles(interaction);
 }
