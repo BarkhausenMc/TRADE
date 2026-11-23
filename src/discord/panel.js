@@ -93,7 +93,7 @@ export function createSpawnerPanel() {
 
   container.addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      '-# Preise werden und können jederzeit durch das TRADE Team geändert'
+      '-# Preise können jederzeit durch das TRADE-leader Team geändert werden.'
     )
   );
 
