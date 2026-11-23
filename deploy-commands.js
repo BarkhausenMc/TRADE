@@ -414,6 +414,10 @@ const commands = [
         )
     ),
 
+  new SlashCommandBuilder()
+    .setName('thread-delete')
+    .setDescription('Notfall: Löscht den aktuellen Thread sofort'),
+ 
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);

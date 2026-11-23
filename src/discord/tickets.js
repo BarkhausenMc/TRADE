@@ -11,7 +11,8 @@ import {
   StringSelectMenuOptionBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  PermissionFlagsBits
 } from 'discord.js';
 
 import {
@@ -21,6 +22,7 @@ import {
   noticeFlags,
   publicFlags,
   buildNotice,
+  hasTradeLeaderRole,
   formatPrice,
   priceText,
   saveJSON,
@@ -567,32 +569,35 @@ export async function handleTicketSold(interaction) {
     });
   }
 
-  ticket.abgeschlossen = true;
-  ticketData.completed += 1;
-
-  saveTickets();
-
-  await updateSpawnerPanel();
-  await updateTradePanel(interaction.guild.id);
-
-  await interaction.update({
-    components: createTicketComponents(ticket)
-  });
-
-  await interaction.channel.send({
-    components: [
-      buildNotice(
-        `✅ <@${interaction.user.id}> hat den Trade abgeschlossen.\n` +
-        '📊 Der Trade wurde der persönlichen Statistik gutgeschrieben.\n' +
-        '🗑️ Dieses Ticket wird in **5 Sekunden** geschlossen.'
-      )
-    ],
-    flags: publicFlags
-  });
-
-  logTicketCompleted(ticket, interaction.user.id).catch(() => {});
-
-  setTimeout(async () => {
+   ticket.abgeschlossen = true;
+   ticketData.completed += 1;
+ 
+   saveTickets();
+ 
+-  await updateSpawnerPanel();
+-  await updateTradePanel(interaction.guild.id);
+-
+   await interaction.update({
+     components: createTicketComponents(ticket)
+   });
+ 
+   await interaction.channel.send({
+     components: [
+       buildNotice(
+         `✅ <@${interaction.user.id}> hat den Trade abgeschlossen.\n` +
+         '📊 Der Trade wurde der persönlichen Statistik gutgeschrieben.\n' +
+         '🗑️ Dieses Ticket wird in **5 Sekunden** geschlossen.'
+       )
+     ],
+     flags: publicFlags
+   });
+ 
+   logTicketCompleted(ticket, interaction.user.id).catch(() => {});
++
++  updateSpawnerPanel().catch(() => {});
++  updateTradePanel(interaction.guild.id).catch(() => {});
+ ss
+   setTimeout(async () => {
     delete ticketData.tickets[interaction.channel.id];
     saveTickets();
 
@@ -636,4 +641,46 @@ export async function handleTicketCancel(interaction) {
       console.error('Ticket-Thread konnte nicht gelöscht werden:', error);
     }
   }, 5000);
+}
+
+export async function handleThreadDelete(interaction) {
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+
+  if (!isAdmin && !hasTradeLeaderRole(interaction)) {
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Du benötigst die **TRADE leader** Rolle oder Administratorrechte.')
+      ],
+      flags: noticeFlags
+    });
+  }
+
+  const ticket = ticketData.tickets[interaction.channel.id];
+
+  if (ticket) {
+    delete ticketData.tickets[interaction.channel.id];
+    saveTickets();
+
+    logTicketCancelled(ticket).catch(() => {});
+  }
+
+  try {
+    await interaction.channel.delete('Thread per /thread-delete gelöscht');
+
+    return interaction.reply({
+      components: [
+        buildNotice('✅ Der Thread wurde gelöscht.')
+      ],
+      flags: noticeFlags
+    });
+  } catch (error) {
+    console.error('Thread konnte per /thread-delete nicht gelöscht werden:', error);
+
+    return interaction.reply({
+      components: [
+        buildNotice('❌ Der Thread konnte nicht gelöscht werden. Bitte überprüfe meine Berechtigungen.')
+      ],
+      flags: noticeFlags
+    });
+  }
 }

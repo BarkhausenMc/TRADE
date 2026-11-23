@@ -22,6 +22,7 @@ import {
 
 import { updateSpawnerPanel, createPanelComponents } from './panel.js';
 import { updatePriceLog } from './price-log.js';
+
 import {
   buildSpawnerSelect,
   buildTicketModal,
@@ -29,7 +30,8 @@ import {
   handleTicketClaim,
   handleTicketRelease,
   handleTicketSold,
-  handleTicketCancel
+  handleTicketCancel,
+  handleThreadDelete
 } from './tickets.js';
 
 import { setCompletedTrades } from './panel.js';
@@ -116,6 +118,10 @@ async function handleInteraction(interaction) {
       if (interaction.commandName === 'toggle-market') {
         return handleToggleMarket(interaction);
       }
+    }
+
+     if (interaction.commandName === 'thread-delete') {
+      return handleThreadDelete(interaction);
     }
 
     if (interaction.isButton() && interaction.customId === 'spawner_price_role') {
