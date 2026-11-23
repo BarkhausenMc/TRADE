@@ -663,24 +663,16 @@ export async function handleThreadDelete(interaction) {
 
     logTicketCancelled(ticket).catch(() => {});
   }
+  await interaction.reply({
+    components: [
+      buildNotice('🗑️ Dieser Thread wird jetzt gelöscht.')
+    ],
+    flags: noticeFlags
+  });
 
   try {
     await interaction.channel.delete('Thread per /thread-delete gelöscht');
-
-    return interaction.reply({
-      components: [
-        buildNotice('✅ Der Thread wurde gelöscht.')
-      ],
-      flags: noticeFlags
-    });
   } catch (error) {
     console.error('Thread konnte per /thread-delete nicht gelöscht werden:', error);
-
-    return interaction.reply({
-      components: [
-        buildNotice('❌ Der Thread konnte nicht gelöscht werden. Bitte überprüfe meine Berechtigungen.')
-      ],
-      flags: noticeFlags
-    });
   }
 }
