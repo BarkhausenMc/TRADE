@@ -596,7 +596,7 @@ export async function handleTicketSold(interaction) {
 +
 +  updateSpawnerPanel().catch(() => {});
 +  updateTradePanel(interaction.guild.id).catch(() => {});
- ss
+ 
    setTimeout(async () => {
     delete ticketData.tickets[interaction.channel.id];
     saveTickets();
