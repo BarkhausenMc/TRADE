@@ -31,7 +31,8 @@ import {
   handleTicketRelease,
   handleTicketSold,
   handleTicketCancel,
-  handleThreadDelete
+  handleThreadDelete,
+  updateOpenTicketPrices
 } from './tickets.js';
 
 import { setCompletedTrades } from './panel.js';
@@ -122,6 +123,38 @@ async function handleInteraction(interaction) {
 
      if (interaction.commandName === 'thread-delete') {
       return handleThreadDelete(interaction);
+    }
+
+    if (interaction.commandName === 'update-price') {
+      if (!hasTradeLeaderRole(interaction)) {
+        return interaction.reply({
+          components: [
+            buildNotice('❌ Du benötigst die **TRADE leader** Rolle für diesen Befehl.')
+          ],
+          flags: noticeFlags
+        });
+      }
+
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      const results = await updateOpenTicketPrices();
+
+      let body =
+        `✅ **${results.updated}** Ticket(s) erfolgreich aktualisiert.\n` +
+        `ℹ️ **${results.unchanged}** Ticket(s) unverändert (Preise bereits aktuell).\n` +
+        `📋 Offene Tickets geprüft: **${results.total}**`;
+
+      if (results.errors.length > 0) {
+        body +=
+          `\n\n⚠️ **Fehler bei ${results.errors.length} Ticket(s):**\n` +
+          results.errors
+            .map(e => `- Trade #${e.tradeNumber} (${e.spawnerName}): ${e.error}`)
+            .join('\n');
+      }
+
+      return interaction.editReply({
+        components: [buildNotice(body)]
+      });
     }
 
     if (interaction.isButton() && interaction.customId === 'spawner_price_role') {

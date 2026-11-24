@@ -417,6 +417,10 @@ const commands = [
   new SlashCommandBuilder()
     .setName('thread-delete')
     .setDescription('Notfall: Löscht den aktuellen Thread sofort'),
+
+  new SlashCommandBuilder()
+    .setName('update-price')
+    .setDescription('Aktualisiert die Preise in allen offenen Tickets'),  
  
 ].map(command => (command.toJSON ? command.toJSON() : command));
 

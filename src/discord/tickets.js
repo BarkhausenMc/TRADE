@@ -676,3 +676,73 @@ export async function handleThreadDelete(interaction) {
     console.error('Thread konnte per /thread-delete nicht gelöscht werden:', error);
   }
 }
+
+export async function updateOpenTicketPrices() {
+  const results = {
+    total: 0,
+    updated: 0,
+    unchanged: 0,
+    errors: []
+  };
+
+  for (const [channelId, ticket] of Object.entries(ticketData.tickets)) {
+    if (ticket.abgeschlossen) {
+      continue;
+    }
+
+    results.total += 1;
+
+    try {
+      const spawner = spawners.find(
+        s => s.name.toLowerCase() === ticket.spawnerName.toLowerCase()
+      );
+
+      if (!spawner) {
+        throw new Error(`Spawner "${ticket.spawnerName}" existiert nicht mehr`);
+      }
+
+      const relevantPrice =
+        ticket.mode === 'kaufen' ? spawner.verkauf : spawner.ankauf;
+
+      const gesamtpreis =
+        relevantPrice === null
+          ? 'Stop'
+          : formatPrice(relevantPrice * ticket.anzahl);
+
+      const changed =
+        ticket.preisStk !== relevantPrice ||
+        ticket.gesamtpreis !== gesamtpreis;
+
+      ticket.preisStk = relevantPrice;
+      ticket.gesamtpreis = gesamtpreis;
+
+      if (changed && ticket.messageId) {
+        const channel = await discordClient.channels.fetch(channelId);
+
+        if (!channel) {
+          throw new Error('Ticket-Channel nicht gefunden');
+        }
+
+        await updateTicketMessage(channel, ticket);
+      }
+
+      if (changed) {
+        results.updated += 1;
+      } else {
+        results.unchanged += 1;
+      }
+    } catch (error) {
+      console.error('[UPDATE PRICE] Fehler bei Ticket', channelId, error);
+
+      results.errors.push({
+        tradeNumber: ticket.tradeNumber,
+        spawnerName: ticket.spawnerName,
+        error: error.message
+      });
+    }
+  }
+
+  saveTickets();
+
+  return results;
+}
