@@ -127,13 +127,18 @@ async function handleInteraction(interaction) {
 
     if (interaction.commandName === 'update-price') {
       if (!hasTradeLeaderRole(interaction)) {
-      return interaction.editReply({
-        components: [buildNotice(body)],
-        flags: noticeFlags
-      });
+        return interaction.reply({
+          components: [
+            buildNotice('❌ Du benötigst die **TRADE leader** Rolle für diesen Befehl.')
+          ],
+          flags: noticeFlags
+        });
       }
 
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      await interaction.reply({
+        components: [buildNotice('⏳ Preise in offenen Tickets werden aktualisiert...')],
+        flags: noticeFlags
+      });
 
       const results = await updateOpenTicketPrices();
 
@@ -150,8 +155,9 @@ async function handleInteraction(interaction) {
             .join('\n');
       }
 
-      return interaction.editReply({
-        components: [buildNotice(body)]
+      return interaction.followUp({
+        components: [buildNotice(body)],
+        flags: noticeFlags
       });
     }
 
