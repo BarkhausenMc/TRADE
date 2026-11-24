@@ -127,12 +127,10 @@ async function handleInteraction(interaction) {
 
     if (interaction.commandName === 'update-price') {
       if (!hasTradeLeaderRole(interaction)) {
-        return interaction.reply({
-          components: [
-            buildNotice('❌ Du benötigst die **TRADE leader** Rolle für diesen Befehl.')
-          ],
-          flags: noticeFlags
-        });
+      return interaction.editReply({
+        components: [buildNotice(body)],
+        flags: noticeFlags
+      });
       }
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
