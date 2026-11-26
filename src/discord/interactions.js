@@ -144,7 +144,7 @@ async function handleInteraction(interaction) {
         return handleTraderStockSelect(interaction);
       }
 
-    if (interaction.customId.startsWith('trader_stock_modal|')) {
+    if (interaction.customId?.startsWith('trader_stock_modal|')) {
         return handleTraderStockModal(interaction);
       }  
 
