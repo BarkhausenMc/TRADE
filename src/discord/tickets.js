@@ -45,7 +45,7 @@ import {
   logTicketCancelled
 } from './logger.js';
 
-import { createTrade } from '../db/database.js';
+import { updateTradePanel } from './trade-panel.js';
 import { updateTraderPanel } from './trader-panel.js';
 
 let discordClient = null;
