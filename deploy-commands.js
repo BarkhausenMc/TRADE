@@ -422,6 +422,10 @@ const commands = [
     .setName('update-price')
     .setDescription('Aktualisiert die Preise in allen offenen Tickets'),  
  
+  new SlashCommandBuilder()
+    .setName('setup-trader-panel')
+    .setDescription('Erstellt oder aktualisiert das Trader-Panel (nur Trader)'),
+
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);

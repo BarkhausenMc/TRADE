@@ -20,6 +20,15 @@ const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS trader_inventory (
+    guild_id TEXT NOT NULL,
+    trader_id TEXT NOT NULL,
+    spawner_name TEXT NOT NULL,
+    menge INTEGER NOT NULL DEFAULT 0 CHECK (menge >= 0),
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, trader_id, spawner_name)
+  );
+
   CREATE TABLE IF NOT EXISTS trades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     guild_id TEXT NOT NULL,
@@ -670,6 +679,116 @@ function setTradePanel(channelId, messageId) {
   setSetting('trade_panel_message_id', messageId);
 }
 
+function getTraderInventory(guildId, traderId) {
+  return db.prepare(`
+    SELECT spawner_name, menge
+    FROM trader_inventory
+    WHERE guild_id = ? AND trader_id = ?
+    ORDER BY spawner_name
+  `).all(guildId, traderId);
+}
+
+function getGuildInventory(guildId) {
+  return db.prepare(`
+    SELECT trader_id, spawner_name, menge
+    FROM trader_inventory
+    WHERE guild_id = ?
+    ORDER BY spawner_name, menge DESC
+  `).all(guildId);
+}
+
+function setTraderStock({ guildId, traderId, spawnerName, menge }) {
+  try {
+    db.prepare(`
+      INSERT INTO trader_inventory (guild_id, trader_id, spawner_name, menge, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(guild_id, trader_id, spawner_name)
+      DO UPDATE SET
+        menge = excluded.menge,
+        updated_at = excluded.updated_at
+    `).run(guildId, traderId, spawnerName, menge, Date.now());
+
+    return { success: true };
+  } catch (error) {
+    console.error('[DB] setTraderStock fehlgeschlagen:', error);
+    return { success: false };
+  }
+}
+
+function completeTicketTradeWithStock({
+  guildId,
+  traderId,
+  source,
+  ticketId,
+  createdBy,
+  spawnerName,
+  anzahl,
+  mode
+}) {
+  const now = Date.now();
+
+  const tx = db.transaction(() => {
+    const existing = db
+      .prepare('SELECT id FROM trades WHERE ticket_id = ?')
+      .get(ticketId);
+
+    if (existing) {
+      return { success: false, reason: 'duplicate' };
+    }
+
+    const row = db.prepare(`
+      SELECT menge
+      FROM trader_inventory
+      WHERE guild_id = ? AND trader_id = ? AND spawner_name = ?
+    `).get(guildId, traderId, spawnerName);
+
+    const vorher = row?.menge ?? 0;
+
+    const neueMenge =
+      mode === 'kaufen'
+        ? Math.max(0, vorher - anzahl)
+        : vorher + anzahl;
+
+    db.prepare(`
+      INSERT INTO trader_inventory (guild_id, trader_id, spawner_name, menge, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(guild_id, trader_id, spawner_name)
+      DO UPDATE SET
+        menge = excluded.menge,
+        updated_at = excluded.updated_at
+    `).run(guildId, traderId, spawnerName, neueMenge, now);
+
+    const result = db.prepare(`
+      INSERT INTO trades (
+        guild_id, trader_id, source, ticket_id, created_by, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(guildId, traderId, source, ticketId, createdBy, now);
+
+    const tradeId = Number(result.lastInsertRowid);
+
+    db.prepare(`
+      INSERT INTO trade_audit (
+        trade_id, action, performed_by, new_data, created_at
+      )
+      VALUES (?, 'CREATE', ?, ?, ?)
+    `).run(
+      tradeId,
+      createdBy,
+      JSON.stringify({ traderId, source, ticketId }),
+      now
+    );
+
+    return { success: true, id: tradeId, vorher, nachher: neueMenge };
+  });
+
+  try {
+    return tx();
+  } catch (error) {
+    console.error('[DB] completeTicketTradeWithStock fehlgeschlagen:', error);
+    return { success: false, reason: 'error' };
+  }
+}
 
 export {
   db,
@@ -696,5 +815,9 @@ export {
   deleteTrade,
   getTradeAudit,
   getTradePanel,
-  setTradePanel
+  setTradePanel,
+  getTraderInventory,
+  getGuildInventory,
+  setTraderStock,
+  completeTicketTradeWithStock,
 };

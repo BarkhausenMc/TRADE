@@ -32,7 +32,10 @@ import {
 } from './context.js';
 
 import { updateSpawnerPanel } from './panel.js';
-import { getTicketBan } from '../db/database.js';
+import { 
+  getTicketBan,
+  completeTicketTradeWithStock
+} from '../db/database.js';
 
 import {
   logTicketCreated,
@@ -552,12 +555,15 @@ export async function handleTicketSold(interaction) {
   }
 
   // Trade dauerhaft in SQLite registrieren.
-  const result = createTrade({
+  const result = completeTicketTradeWithStock({
     guildId: interaction.guild.id,
     traderId: ticket.claimedBy,
     source: 'ticket',
     ticketId: interaction.channel.id,
-    createdBy: interaction.user.id
+    createdBy: interaction.user.id,
+    spawnerName: ticket.spawnerName,
+    anzahl: ticket.anzahl,
+    mode: ticket.mode
   });
 
   if (!result.success) {
@@ -593,6 +599,7 @@ export async function handleTicketSold(interaction) {
    });
  
    logTicketCompleted(ticket, interaction.user.id).catch(() => {});
+   updateTraderPanel(interaction.guild.id).catch(() => {});
 +
 +  updateSpawnerPanel().catch(() => {});
 +  updateTradePanel(interaction.guild.id).catch(() => {});

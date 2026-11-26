@@ -20,6 +20,8 @@ import { createClient } from './discord/client.js';
 import { bindTradePanelClient } from './discord/trade-panel.js';
 import { bindAdminPanelClient } from './discord/admin-panel.js';
 
+
+
 const client = createClient();
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -131,5 +133,6 @@ bindTicketClient(client);
 bindTradePanelClient(client);
 bindAdminPanelClient(client);
 bindLogger(client);
+bindTraderPanelClient(client);
 
 client.login(process.env.DISCORD_BOT_TOKEN);

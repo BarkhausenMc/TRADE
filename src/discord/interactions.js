@@ -65,6 +65,13 @@ import {
   buildMarketDisabledNotice
 } from './market-toggle.js';
 
+import {
+  handleTraderPanelCommand,
+  handleTraderStockEdit,
+  handleTraderStockSelect,
+  handleTraderStockModal
+} from './trader-panel.js';
+
 function canManageTicketBans(interaction) {
   return (
     interaction.memberPermissions?.has(
@@ -124,6 +131,22 @@ async function handleInteraction(interaction) {
      if (interaction.commandName === 'thread-delete') {
       return handleThreadDelete(interaction);
     }
+
+    if (interaction.commandName === 'setup-trader-panel') {
+      return handleTraderPanelCommand(interaction);
+    }
+
+    if (interaction.customId === 'trader_stock_edit') {
+        return handleTraderStockEdit(interaction);
+      }
+
+    if (interaction.customId === 'trader_stock_select') {
+        return handleTraderStockSelect(interaction);
+      }
+
+    if (interaction.customId.startsWith('trader_stock_modal|')) {
+        return handleTraderStockModal(interaction);
+      }  
 
     if (interaction.commandName === 'update-price') {
       if (!hasTradeLeaderRole(interaction)) {
