@@ -203,13 +203,15 @@ export async function handleTraderPanelCommand(interaction) {
             ? '✅ Das Trader-Panel wurde aktualisiert.'
             : '✅ Das Trader-Panel wurde erstellt.'
         )
-      ]
+      ],
+      flags: noticeFlags
     });
   } catch (error) {
     console.error(error);
 
     await interaction.editReply({
-      components: [buildNotice('❌ Das Trader-Panel konnte nicht erstellt werden.')]
+      components: [buildNotice('❌ Das Trader-Panel konnte nicht erstellt werden.')],
+      flags: noticeFlags
     });
   }
 }
