@@ -790,6 +790,18 @@ function completeTicketTradeWithStock({
   }
 }
 
+function getTraderPanel() {
+  return {
+    channelId: getSetting('trader_panel_channel_id'),
+    messageId: getSetting('trader_panel_message_id')
+  };
+}
+
+function setTraderPanel(channelId, messageId) {
+  setSetting('trader_panel_channel_id', channelId);
+  setSetting('trader_panel_message_id', messageId);
+}
+
 export {
   db,
   encryptJwt,
@@ -820,4 +832,6 @@ export {
   getGuildInventory,
   setTraderStock,
   completeTicketTradeWithStock,
+  getTraderPanel,
+  setTraderPanel
 };
