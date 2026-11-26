@@ -19,8 +19,7 @@ import {
 import { createClient } from './discord/client.js';
 import { bindTradePanelClient } from './discord/trade-panel.js';
 import { bindAdminPanelClient } from './discord/admin-panel.js';
-
-
+import { bindTraderPanelClient } from './discord/trader-panel.js';
 
 const client = createClient();
 
