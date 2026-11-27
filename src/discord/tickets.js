@@ -511,6 +511,7 @@ export async function handleTicketRelease(interaction) {
 
 export async function handleTicketSold(interaction) {
   await interaction.deferUpdate();
+
   const ticket = await getTicketFromChannel(interaction);
 
   if (!ticket) return;
@@ -518,7 +519,7 @@ export async function handleTicketSold(interaction) {
   const traderRole = resolveTraderRole(interaction.guild);
 
   if (!isTraderMember(interaction, traderRole)) {
-    return interaction.reply({
+    return interaction.followUp({
       components: [
         buildNotice('❌ Nur Mitglieder der Trader-Rolle dürfen Trades abschließen.')
       ],
@@ -527,7 +528,7 @@ export async function handleTicketSold(interaction) {
   }
 
   if (ticket.abgeschlossen) {
-    return interaction.reply({
+    return interaction.followUp({
       components: [
         buildNotice('⚠️ Dieser Trade wurde bereits abgeschlossen.')
       ],
@@ -536,7 +537,7 @@ export async function handleTicketSold(interaction) {
   }
 
   if (!ticket.claimedBy) {
-    return interaction.reply({
+    return interaction.followUp({
       components: [
         buildNotice('❌ Dieses Ticket muss zuerst von einem Trader geclaimt werden.')
       ],
@@ -545,7 +546,7 @@ export async function handleTicketSold(interaction) {
   }
 
   if (ticket.claimedBy !== interaction.user.id) {
-    return interaction.reply({
+    return interaction.followUp({
       components: [
         buildNotice(
           `❌ Nur der Claimer <@${ticket.claimedBy}> darf dieses Ticket abschließen.`
@@ -555,7 +556,6 @@ export async function handleTicketSold(interaction) {
     });
   }
 
-  // Trade dauerhaft in SQLite registrieren.
   const result = completeTicketTradeWithStock({
     guildId: interaction.guild.id,
     traderId: ticket.claimedBy,
@@ -568,7 +568,7 @@ export async function handleTicketSold(interaction) {
   });
 
   if (!result.success) {
-    return interaction.reply({
+    return interaction.followUp({
       components: [
         buildNotice('⚠️ Dieser Ticket-Trade wurde bereits registriert.')
       ],
@@ -576,36 +576,33 @@ export async function handleTicketSold(interaction) {
     });
   }
 
-   ticket.abgeschlossen = true;
-   ticketData.completed += 1;
- 
-   saveTickets();
- 
--  await updateSpawnerPanel();
--  await updateTradePanel(interaction.guild.id);
--
-   interaction.editReply({
-     components: createTicketComponents(ticket)
-   });
- 
-   await interaction.channel.send({
-     components: [
-       buildNotice(
-         `✅ <@${interaction.user.id}> hat den Trade abgeschlossen.\n` +
-         '📊 Der Trade wurde der persönlichen Statistik gutgeschrieben.\n' +
-         '🗑️ Dieses Ticket wird in **5 Sekunden** geschlossen.'
-       )
-     ],
-     flags: publicFlags
-   });
- 
-   logTicketCompleted(ticket, interaction.user.id).catch(() => {});
-   updateTraderPanel(interaction.guild.id).catch(() => {});
-+
-+  updateSpawnerPanel().catch(() => {});
-+  updateTradePanel(interaction.guild.id).catch(() => {});
- 
-   setTimeout(async () => {
+  ticket.abgeschlossen = true;
+  ticketData.completed += 1;
+
+  saveTickets();
+
+  await interaction.editReply({
+    components: createTicketComponents(ticket)
+  });
+
+  await interaction.channel.send({
+    components: [
+      buildNotice(
+        `✅ <@${interaction.user.id}> hat den Trade abgeschlossen.\n` +
+        '📊 Der Trade wurde der persönlichen Statistik gutgeschrieben.\n' +
+        '🗑️ Dieses Ticket wird in **5 Sekunden** geschlossen.'
+      )
+    ],
+    flags: publicFlags
+  });
+
+  logTicketCompleted(ticket, interaction.user.id).catch(() => {});
+
+  updateSpawnerPanel().catch(() => {});
+  updateTradePanel(interaction.guild.id).catch(() => {});
+  updateTraderPanel(interaction.guild.id).catch(() => {});
+
+  setTimeout(async () => {
     delete ticketData.tickets[interaction.channel.id];
     saveTickets();
 
