@@ -510,6 +510,7 @@ export async function handleTicketRelease(interaction) {
 
 
 export async function handleTicketSold(interaction) {
+  await interaction.deferUpdate();
   const ticket = await getTicketFromChannel(interaction);
 
   if (!ticket) return;
@@ -583,7 +584,7 @@ export async function handleTicketSold(interaction) {
 -  await updateSpawnerPanel();
 -  await updateTradePanel(interaction.guild.id);
 -
-   await interaction.update({
+   interaction.editReply({
      components: createTicketComponents(ticket)
    });
  
