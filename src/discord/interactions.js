@@ -149,6 +149,10 @@ async function handleInteraction(interaction) {
         return handleTraderStockModal(interaction);
       }  
 
+    if (interaction.commandName === 'thread-cleanup') {
+      return handleThreadCleanupCommand(interaction);
+    }  
+
     if (interaction.commandName === 'update-price') {
       if (!hasTradeLeaderRole(interaction)) {
         return interaction.reply({
