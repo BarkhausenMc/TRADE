@@ -657,12 +657,12 @@ export async function handleTicketCancel(interaction) {
 }
 
 export async function handleThreadDelete(interaction) {
-  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+  const traderRole = resolveTraderRole(interaction.guild);
 
-  if (!isAdmin && !hasTradeLeaderRole(interaction)) {
+  if (!isTraderMember(interaction, traderRole)) {
     return interaction.reply({
       components: [
-        buildNotice('❌ Du benötigst die **TRADE leader** Rolle oder Administratorrechte.')
+        buildNotice('❌ Nur Mitglieder der **Trader**-Rolle können Threads löschen.')
       ],
       flags: noticeFlags
     });
@@ -676,6 +676,7 @@ export async function handleThreadDelete(interaction) {
 
     logTicketCancelled(ticket).catch(() => {});
   }
+
   await interaction.reply({
     components: [
       buildNotice('🗑️ Dieser Thread wird jetzt gelöscht.')
