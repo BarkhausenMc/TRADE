@@ -128,10 +128,11 @@ export async function handleThreadCleanupCommand(interaction) {
   const orphans = await findOrphanThreads(interaction.guild);
 
   if (orphans.length === 0) {
-    return interaction.editReply({
+        return interaction.editReply({
       components: [
         buildNotice('✅ Keine verwaisten Ticket-Threads gefunden.')
-      ]
+      ],
+      flags: noticeFlags
     });
   }
 
@@ -142,23 +143,25 @@ export async function handleThreadCleanupCommand(interaction) {
   if (mode === 'loeschen') {
     const results = await deleteOrphanThreads(interaction.guild);
 
-    return interaction.editReply({
+        return interaction.editReply({
       components: [
         buildNotice(
           `🧹 **Bereinigung abgeschlossen**\n` +
           `🗑️ Gelöscht: **${results.deleted.length}**\n` +
           `⚠️ Fehlgeschlagen: **${results.failed.length}**`
         )
-      ]
+      ],
+      flags: noticeFlags
     });
   }
 
-  return interaction.editReply({
+    return interaction.editReply({
     components: [
       buildNotice(
         `🔍 **${orphans.length} verwaiste Ticket-Threads gefunden:**\n${list}\n\n` +
         'Mit `/thread-cleanup modus:Löschen` entfernst du sie alle.'
       )
-    ]
+    ],
+    flags: noticeFlags
   });
 }
