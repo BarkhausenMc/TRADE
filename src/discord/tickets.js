@@ -291,14 +291,16 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
       ? 'Stop'
       : formatPrice(relevantPrice * anzahl);
 
+  let thread = null;
   try {
+    
     const panelChannel = await discordClient.channels.fetch(panelData.channelId);
 
     if (!panelChannel) {
       throw new Error('Panel-Kanal nicht gefunden');
     }
 
-    const thread = await panelChannel.threads.create({
+      thread = await panelChannel.threads.create({
       name: `${actionLabel} • ${spawner.emoji || '🔹'} ${spawner.name} • 📦 Menge: ${anzahl}`,
       autoArchiveDuration: 1440,
       type: ChannelType.PrivateThread,
@@ -383,6 +385,12 @@ export async function createTicketThread(interaction, mode, spawnerName, ingameN
 
   } catch (error) {
     console.error('Ticket konnte nicht erstellt werden:', error);
+
+      if (thread) {
+        await thread
+          .delete('Ticket-Erstellung fehlgeschlagen – Thread verworfen')
+          .catch(() => {});
+      }
 
     await interaction.editReply({
       components: [buildNotice('❌ Das Ticket konnte nicht erstellt werden.')],

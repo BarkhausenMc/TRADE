@@ -426,6 +426,20 @@ const commands = [
     .setName('setup-trader-panel')
     .setDescription('Erstellt oder aktualisiert das Trader-Panel (nur Trader)'),
 
+  new SlashCommandBuilder()
+    .setName('thread-cleanup')
+    .setDescription('Findet und löscht verwaiste Ticket-Threads')
+    .addStringOption(option =>
+      option
+        .setName('modus')
+        .setDescription('Nur prüfen oder löschen')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Prüfen', value: 'pruefen' },
+          { name: 'Löschen', value: 'loeschen' }
+        )
+    ),
+
 ].map(command => (command.toJSON ? command.toJSON() : command));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);

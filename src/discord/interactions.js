@@ -72,6 +72,7 @@ import {
   handleTraderStockModal
 } from './trader-panel.js';
 
+import { handleThreadCleanupCommand } from './orphan-threads.js';
 function canManageTicketBans(interaction) {
   return (
     interaction.memberPermissions?.has(

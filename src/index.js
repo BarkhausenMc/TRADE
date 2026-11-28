@@ -20,6 +20,7 @@ import { createClient } from './discord/client.js';
 import { bindTradePanelClient } from './discord/trade-panel.js';
 import { bindAdminPanelClient } from './discord/admin-panel.js';
 import { bindTraderPanelClient } from './discord/trader-panel.js';
+import { bindOrphanThreadsClient, sweepAllGuilds } from './discord/orphan-threads.js';
 
 const client = createClient();
 
@@ -89,7 +90,7 @@ client.once('clientReady', async () => {
   console.log(gradient('          ✨ TRADE BOT ONLINE ✨'));
 
   restorePriceLog();
-
+  sweepAllGuilds(client).catch(() => {});
   logBotStart().catch(() => {});
 });
 
@@ -133,5 +134,6 @@ bindTradePanelClient(client);
 bindAdminPanelClient(client);
 bindLogger(client);
 bindTraderPanelClient(client);
+bindOrphanThreadsClient(client);
 
 client.login(process.env.DISCORD_BOT_TOKEN);
